@@ -1,6 +1,12 @@
-import 'dotenv/config';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { config as loadEnv } from 'dotenv';
 import { getPrismaClient } from '../src/index.js';
 import { seedInstitutionalData } from './seed/institutional.js';
+
+loadEnv({
+  path: resolve(dirname(fileURLToPath(import.meta.url)), '../../../.env'),
+});
 
 const prisma = getPrismaClient();
 

@@ -32,6 +32,11 @@ coverage/
 .vscode/
 .idea/
 
+# Repomix Output
+repomix.output.*
+paggrupoinvestigacionia.*
+repomix-output.*
+
 # Prisma local
 *.db
 *.db-journal

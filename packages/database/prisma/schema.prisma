@@ -115,6 +115,48 @@ enum ExternalNewsStatus {
   FAILED
 }
 
+enum NewsOrigin {
+  INTERNAL
+  EXTERNAL
+}
+
+enum ExternalNewsSourceType {
+  ACADEMIC
+  NEWS_AGENCY
+  NEWS_MEDIA
+  CORPORATE_RESEARCH
+  CORPORATE_BLOG
+  GOVERNMENT
+  UNIVERSITY
+  OTHER
+}
+
+enum ExternalNewsSourceStatus {
+  ACTIVE
+  PAUSED
+}
+
+enum ExternalNewsIngestionMethod {
+  AUTO
+  RSS
+  ATOM
+  SITEMAP
+  HTML
+  MANUAL
+}
+
+enum ExternalNewsReviewMode {
+  REQUIRED
+  AUTOMATIC
+}
+
+enum ExternalSummaryStatus {
+  SOURCE
+  EXTRACTIVE
+  AI_GENERATED
+  REVIEWED
+}
+
 model User {
   id             String     @id @default(uuid()) @db.Uuid
   email          String     @unique @db.VarChar(320)
@@ -153,9 +195,16 @@ model ContentItem {
   seoTitle        String?       @db.VarChar(70)
   metaDescription String?       @db.VarChar(180)
   featured        Boolean       @default(false)
+  origin          NewsOrigin    @default(INTERNAL)
+  externalUrl     String?
+  sourceName      String?       @db.VarChar(180)
+  sourceType      ExternalNewsSourceType?
+  originalTitle   String?       @db.VarChar(300)
+  externalPublishedAt DateTime?
   lockVersion     Int           @default(1)
   scheduledAt     DateTime?
   publishedAt     DateTime?
+  expiresAt       DateTime?
   archivedAt      DateTime?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -183,8 +232,11 @@ model ContentItem {
 
   @@index([type, status])
   @@index([status, publishedAt])
+  @@index([status, expiresAt])
   @@index([assignedEditorId, status])
   @@index([featured, publishedAt])
+  @@index([origin, publishedAt])
+  @@index([sourceName, publishedAt])
 }
 
 model ContentRevision {
@@ -355,34 +407,110 @@ model ContentMedia {
   @@index([mediaAssetId])
 }
 
+model ExternalNewsSource {
+  id                    String                      @id @default(uuid()) @db.Uuid
+  key                   String                      @unique @db.VarChar(100)
+  name                  String                      @db.VarChar(180)
+  domain                String                      @unique @db.VarChar(255)
+  websiteUrl            String
+  listingUrl            String?
+  feedUrl               String?
+  discoveryUrl          String?
+  detectedMethod        String?                     @db.VarChar(30)
+  type                  ExternalNewsSourceType
+  status                ExternalNewsSourceStatus    @default(PAUSED)
+  ingestionMethod       ExternalNewsIngestionMethod @default(AUTO)
+  reviewMode            ExternalNewsReviewMode      @default(REQUIRED)
+  language              String                      @default("es") @db.VarChar(12)
+  includeKeywords       String[]                    @default([])
+  excludeKeywords       String[]                    @default([])
+  includeUrlPatterns    String[]                    @default([])
+  excludeUrlPatterns    String[]                    @default([])
+  minimumRelevanceScore Int                         @default(30)
+  maxItemsPerSync       Int                         @default(30)
+  checkIntervalMinutes  Int                         @default(360)
+  nextSyncAt            DateTime?
+  lastSyncAt            DateTime?
+  lastSuccessAt         DateTime?
+  lastSyncStatus        String?                     @db.VarChar(30)
+  lastSyncMessage       String?
+  consecutiveFailures   Int                         @default(0)
+  deletedAt             DateTime?
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+
+  items    ExternalNewsItem[]
+  syncRuns ExternalNewsSyncRun[]
+
+  @@index([status, deletedAt])
+  @@index([status, nextSyncAt])
+  @@index([type, status])
+  @@index([domain])
+}
+
+model ExternalNewsSyncRun {
+  id            String   @id @default(uuid()) @db.Uuid
+  sourceId      String   @db.Uuid
+  startedAt     DateTime @default(now())
+  finishedAt    DateTime?
+  status        String   @db.VarChar(30)
+  strategy      String?  @db.VarChar(30)
+  discoveryUrl  String?
+  fetched       Int      @default(0)
+  accepted      Int      @default(0)
+  inserted      Int      @default(0)
+  updated       Int      @default(0)
+  duplicates    Int      @default(0)
+  excluded      Int      @default(0)
+  durationMs    Int?
+  errorMessage  String?
+  diagnostics   Json?
+
+  source ExternalNewsSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId, startedAt])
+  @@index([status, startedAt])
+}
+
 model ExternalNewsItem {
-  id               String             @id @default(uuid()) @db.Uuid
-  sourceKey        String             @db.VarChar(100)
-  externalId       String?            @db.VarChar(255)
+  id               String                @id @default(uuid()) @db.Uuid
+  sourceId         String?               @db.Uuid
+  sourceKey        String                @db.VarChar(100)
+  externalId       String?               @db.VarChar(255)
   canonicalUrl     String
-  canonicalUrlHash String             @unique @db.VarChar(64)
-  title            String             @db.VarChar(300)
-  summary          String?
+  canonicalUrlHash String                @unique @db.VarChar(64)
+  title            String                @db.VarChar(300)
+  sourceSummary    String?
+  generatedSummary String?
+  summaryStatus    ExternalSummaryStatus @default(SOURCE)
+  language         String?               @db.VarChar(12)
+  author           String?               @db.VarChar(220)
+  imageUrl         String?
+  matchedKeywords  String[]              @default([])
+  relevanceScore   Int                   @default(0)
   publishedAt      DateTime?
-  contentHash      String?            @db.VarChar(64)
-  status           ExternalNewsStatus @default(DISCOVERED)
+  contentHash      String?               @db.VarChar(64)
+  status           ExternalNewsStatus    @default(DISCOVERED)
   rawMetadata      Json?
   failureReason    String?
-  firstSeenAt      DateTime           @default(now())
+  firstSeenAt      DateTime              @default(now())
   reviewedAt       DateTime?
   importedAt       DateTime?
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
 
-  contentId String?      @db.Uuid
-  content   ContentItem? @relation(fields: [contentId], references: [id], onDelete: SetNull)
+  source    ExternalNewsSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  contentId String?             @db.Uuid
+  content   ContentItem?        @relation(fields: [contentId], references: [id], onDelete: SetNull)
 
+  @@index([sourceId, status])
   @@index([sourceKey, externalId])
   @@index([sourceKey, status])
   @@index([status, firstSeenAt])
   @@index([publishedAt])
   @@index([contentHash])
   @@index([contentId])
+  @@index([relevanceScore, publishedAt])
 }
 
 model ContactMessage {

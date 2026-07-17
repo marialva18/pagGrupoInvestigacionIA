@@ -5,9 +5,17 @@ import {
   createNewsSchema,
   listNewsQuerySchema,
   newsIdParamsSchema,
+  restoreNewsSchema,
   updateNewsSchema,
 } from './news.schema.js';
-import { archiveNews, createNews, getNewsById, listNews, updateNews } from './news.service.js';
+import {
+  archiveNews,
+  createNews,
+  getNewsById,
+  listNews,
+  restoreNews,
+  updateNews,
+} from './news.service.js';
 
 export const createNewsHandler: RequestHandler = (request, response, next) => {
   const parsed = createNewsSchema.safeParse(request.body);
@@ -125,6 +133,38 @@ export const archiveNewsHandler: RequestHandler = (request, response, next) => {
   }
 
   void archiveNews(parsedParams.data.newsId, parsedBody.data)
+    .then((news) => {
+      response.status(200).json({
+        data: news,
+      });
+    })
+    .catch(next);
+};
+
+export const restoreNewsHandler: RequestHandler = (request, response, next) => {
+  const parsedParams = newsIdParamsSchema.safeParse(request.params);
+
+  if (!parsedParams.success) {
+    next(new AppError('El identificador de la noticia no es válido.', 400, 'NEWS_INVALID_ID'));
+
+    return;
+  }
+
+  const parsedBody = restoreNewsSchema.safeParse(request.body);
+
+  if (!parsedBody.success) {
+    next(
+      new AppError(
+        'Los datos para restaurar la noticia no son válidos.',
+        400,
+        'NEWS_RESTORE_INVALID_INPUT',
+      ),
+    );
+
+    return;
+  }
+
+  void restoreNews(parsedParams.data.newsId, parsedBody.data)
     .then((news) => {
       response.status(200).json({
         data: news,

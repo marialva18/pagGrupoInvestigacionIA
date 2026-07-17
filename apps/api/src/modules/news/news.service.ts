@@ -1,3 +1,4 @@
+import type { RestoreNewsInput } from './news.schema.js';
 import { getPrismaClient } from '@intgarti/database';
 import { AppError } from '../../common/errors/app-error.js';
 import { env } from '../../config/env.js';
@@ -1159,6 +1160,184 @@ export async function archiveNews(newsId: string, input: ArchiveNewsInput) {
       ...archived,
 
       categories: archived.categories.map(({ category }) => category),
+    };
+  });
+}
+
+export async function restoreNews(newsId: string, input: RestoreNewsInput) {
+  const prisma = getPrismaClient();
+
+  return prisma.$transaction(async (transaction) => {
+    const editor = await transaction.user.findUnique({
+      where: {
+        id: env.DEV_EDITOR_USER_ID,
+      },
+      select: {
+        id: true,
+        role: true,
+        status: true,
+      },
+    });
+
+    if (!editor || editor.status !== 'ACTIVE' || !['ADMIN', 'EDITOR'].includes(editor.role)) {
+      throw new AppError(
+        'El editor local no existe o no está activo.',
+        503,
+        'DEVELOPMENT_EDITOR_NOT_AVAILABLE',
+      );
+    }
+
+    const accessCondition =
+      editor.role === 'ADMIN'
+        ? {}
+        : {
+            OR: [
+              {
+                createdById: editor.id,
+              },
+              {
+                assignedEditorId: editor.id,
+              },
+            ],
+          };
+
+    const existing = await transaction.contentItem.findFirst({
+      where: {
+        AND: [
+          {
+            id: newsId,
+          },
+          {
+            type: 'NEWS',
+          },
+          accessCondition,
+        ],
+      },
+      select: {
+        id: true,
+        status: true,
+        slug: true,
+        title: true,
+        lockVersion: true,
+        archivedAt: true,
+        publishedAt: true,
+      },
+    });
+
+    if (!existing) {
+      throw new AppError('No se encontró la noticia solicitada.', 404, 'NEWS_NOT_FOUND');
+    }
+
+    if (existing.lockVersion !== input.lockVersion) {
+      throw new AppError(
+        'La noticia fue modificada por otro usuario. Actualiza la página antes de restaurarla.',
+        409,
+        'NEWS_VERSION_CONFLICT',
+      );
+    }
+
+    if (existing.status !== 'ARCHIVED') {
+      throw new AppError('Solo pueden restaurarse noticias archivadas.', 409, 'NEWS_NOT_ARCHIVED');
+    }
+
+    const transition = await transaction.contentItem.updateMany({
+      where: {
+        id: newsId,
+        status: 'ARCHIVED',
+        lockVersion: input.lockVersion,
+      },
+      data: {
+        status: 'DRAFT',
+        archivedAt: null,
+        scheduledAt: null,
+        publishedAt: null,
+        reviewedById: null,
+        approvedById: null,
+        featured: false,
+
+        lockVersion: {
+          increment: 1,
+        },
+      },
+    });
+
+    if (transition.count !== 1) {
+      throw new AppError(
+        'La noticia fue modificada durante la restauración.',
+        409,
+        'NEWS_VERSION_CONFLICT',
+      );
+    }
+
+    const restored = await transaction.contentItem.findUnique({
+      where: {
+        id: newsId,
+      },
+      select: {
+        id: true,
+        type: true,
+        status: true,
+        slug: true,
+        title: true,
+        summary: true,
+        featured: true,
+        lockVersion: true,
+        scheduledAt: true,
+        publishedAt: true,
+        archivedAt: true,
+        createdAt: true,
+        updatedAt: true,
+
+        categories: {
+          select: {
+            category: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!restored) {
+      throw new AppError(
+        'No fue posible recuperar la noticia restaurada.',
+        500,
+        'NEWS_RESTORE_FAILED',
+      );
+    }
+
+    await transaction.auditLog.create({
+      data: {
+        actorId: editor.id,
+        action: 'NEWS_RESTORED',
+        entityType: 'ContentItem',
+        entityId: newsId,
+        reason: input.reason ?? null,
+
+        before: {
+          status: existing.status,
+          archivedAt: existing.archivedAt?.toISOString() ?? null,
+          publishedAt: existing.publishedAt?.toISOString() ?? null,
+          lockVersion: existing.lockVersion,
+        },
+
+        after: {
+          status: restored.status,
+          archivedAt: null,
+          publishedAt: null,
+          lockVersion: restored.lockVersion,
+        },
+      },
+    });
+
+    return {
+      ...restored,
+
+      categories: restored.categories.map(({ category }) => category),
     };
   });
 }

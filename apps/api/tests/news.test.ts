@@ -187,3 +187,55 @@ test('rejects an invalid identifier when archiving news', async () => {
     assert.equal(body.error.code, 'NEWS_INVALID_ID');
   });
 });
+
+test('rejects a restore request without lock version', async () => {
+  await withApiServer(async (baseUrl) => {
+    const response = await fetch(
+      `${baseUrl}/api/v1/editor/news/00000000-0000-4000-8000-000000000001/restore`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reason: 'Restauración durante una prueba del sistema.',
+        }),
+      },
+    );
+
+    assert.equal(response.status, 400);
+
+    const body = (await response.json()) as {
+      error: {
+        code: string;
+      };
+    };
+
+    assert.equal(body.error.code, 'NEWS_RESTORE_INVALID_INPUT');
+  });
+});
+
+test('rejects an invalid identifier when restoring news', async () => {
+  await withApiServer(async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/editor/news/not-a-uuid/restore`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        lockVersion: 1,
+        reason: 'Restauración durante una prueba del sistema.',
+      }),
+    });
+
+    assert.equal(response.status, 400);
+
+    const body = (await response.json()) as {
+      error: {
+        code: string;
+      };
+    };
+
+    assert.equal(body.error.code, 'NEWS_INVALID_ID');
+  });
+});

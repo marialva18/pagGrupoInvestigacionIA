@@ -140,3 +140,11 @@ export const archiveNewsSchema = z.object({
 });
 
 export type ArchiveNewsInput = z.infer<typeof archiveNewsSchema>;
+
+export const restoreNewsSchema = z.object({
+  lockVersion: z.number().int().min(1),
+
+  reason: z.string().trim().min(10).max(500).optional(),
+});
+
+export type RestoreNewsInput = z.infer<typeof restoreNewsSchema>;

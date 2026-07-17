@@ -1,12 +1,13 @@
 import type { RequestHandler } from 'express';
 import { AppError } from '../../common/errors/app-error.js';
 import {
+  archiveNewsSchema,
   createNewsSchema,
   listNewsQuerySchema,
   newsIdParamsSchema,
   updateNewsSchema,
 } from './news.schema.js';
-import { createNews, getNewsById, listNews, updateNews } from './news.service.js';
+import { archiveNews, createNews, getNewsById, listNews, updateNews } from './news.service.js';
 
 export const createNewsHandler: RequestHandler = (request, response, next) => {
   const parsed = createNewsSchema.safeParse(request.body);
@@ -92,6 +93,38 @@ export const updateNewsHandler: RequestHandler = (request, response, next) => {
   }
 
   void updateNews(parsedParams.data.newsId, parsedBody.data)
+    .then((news) => {
+      response.status(200).json({
+        data: news,
+      });
+    })
+    .catch(next);
+};
+
+export const archiveNewsHandler: RequestHandler = (request, response, next) => {
+  const parsedParams = newsIdParamsSchema.safeParse(request.params);
+
+  if (!parsedParams.success) {
+    next(new AppError('El identificador de la noticia no es válido.', 400, 'NEWS_INVALID_ID'));
+
+    return;
+  }
+
+  const parsedBody = archiveNewsSchema.safeParse(request.body);
+
+  if (!parsedBody.success) {
+    next(
+      new AppError(
+        'Los datos para archivar la noticia no son válidos.',
+        400,
+        'NEWS_ARCHIVE_INVALID_INPUT',
+      ),
+    );
+
+    return;
+  }
+
+  void archiveNews(parsedParams.data.newsId, parsedBody.data)
     .then((news) => {
       response.status(200).json({
         data: news,

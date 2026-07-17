@@ -133,3 +133,10 @@ export const updateNewsSchema = z
   });
 
 export type UpdateNewsInput = z.infer<typeof updateNewsSchema>;
+export const archiveNewsSchema = z.object({
+  lockVersion: z.number().int().min(1),
+
+  reason: z.string().trim().min(10).max(500).optional(),
+});
+
+export type ArchiveNewsInput = z.infer<typeof archiveNewsSchema>;

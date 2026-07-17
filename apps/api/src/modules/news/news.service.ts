@@ -1,8 +1,12 @@
-import type { UpdateNewsInput } from './news.schema.js';
 import { getPrismaClient } from '@intgarti/database';
 import { AppError } from '../../common/errors/app-error.js';
 import { env } from '../../config/env.js';
-import type { CreateNewsInput, ListNewsInput } from './news.schema.js';
+import type {
+  ArchiveNewsInput,
+  CreateNewsInput,
+  ListNewsInput,
+  UpdateNewsInput,
+} from './news.schema.js';
 
 function normalizeSlug(value: string): string {
   return value
@@ -983,6 +987,178 @@ export async function updateNews(newsId: string, input: UpdateNewsInput) {
       ...updated,
 
       categories: updated.categories.map(({ category }) => category),
+    };
+  });
+}
+export async function archiveNews(newsId: string, input: ArchiveNewsInput) {
+  const prisma = getPrismaClient();
+
+  return prisma.$transaction(async (transaction) => {
+    const editor = await transaction.user.findUnique({
+      where: {
+        id: env.DEV_EDITOR_USER_ID,
+      },
+      select: {
+        id: true,
+        role: true,
+        status: true,
+      },
+    });
+
+    if (!editor || editor.status !== 'ACTIVE' || !['ADMIN', 'EDITOR'].includes(editor.role)) {
+      throw new AppError(
+        'El editor local no existe o no está activo.',
+        503,
+        'DEVELOPMENT_EDITOR_NOT_AVAILABLE',
+      );
+    }
+
+    const accessCondition =
+      editor.role === 'ADMIN'
+        ? {}
+        : {
+            OR: [
+              {
+                createdById: editor.id,
+              },
+              {
+                assignedEditorId: editor.id,
+              },
+            ],
+          };
+
+    const existing = await transaction.contentItem.findFirst({
+      where: {
+        AND: [
+          {
+            id: newsId,
+          },
+          {
+            type: 'NEWS',
+          },
+          accessCondition,
+        ],
+      },
+      select: {
+        id: true,
+        status: true,
+        slug: true,
+        title: true,
+        lockVersion: true,
+        archivedAt: true,
+      },
+    });
+
+    if (!existing) {
+      throw new AppError('No se encontró la noticia solicitada.', 404, 'NEWS_NOT_FOUND');
+    }
+
+    if (existing.lockVersion !== input.lockVersion) {
+      throw new AppError(
+        'La noticia fue modificada por otro usuario. Actualiza la página antes de archivarla.',
+        409,
+        'NEWS_VERSION_CONFLICT',
+      );
+    }
+
+    if (existing.status === 'ARCHIVED') {
+      throw new AppError('La noticia ya se encuentra archivada.', 409, 'NEWS_ALREADY_ARCHIVED');
+    }
+
+    const archivedAt = new Date();
+
+    const transition = await transaction.contentItem.updateMany({
+      where: {
+        id: newsId,
+        lockVersion: input.lockVersion,
+      },
+      data: {
+        status: 'ARCHIVED',
+        archivedAt,
+        scheduledAt: null,
+        featured: false,
+
+        lockVersion: {
+          increment: 1,
+        },
+      },
+    });
+
+    if (transition.count !== 1) {
+      throw new AppError(
+        'La noticia fue modificada durante el archivado.',
+        409,
+        'NEWS_VERSION_CONFLICT',
+      );
+    }
+
+    const archived = await transaction.contentItem.findUnique({
+      where: {
+        id: newsId,
+      },
+      select: {
+        id: true,
+        type: true,
+        status: true,
+        slug: true,
+        title: true,
+        summary: true,
+        featured: true,
+        lockVersion: true,
+        scheduledAt: true,
+        publishedAt: true,
+        archivedAt: true,
+        createdAt: true,
+        updatedAt: true,
+
+        categories: {
+          select: {
+            category: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!archived) {
+      throw new AppError(
+        'No fue posible recuperar la noticia archivada.',
+        500,
+        'NEWS_ARCHIVE_FAILED',
+      );
+    }
+
+    await transaction.auditLog.create({
+      data: {
+        actorId: editor.id,
+        action: 'NEWS_ARCHIVED',
+        entityType: 'ContentItem',
+        entityId: newsId,
+        reason: input.reason ?? null,
+
+        before: {
+          status: existing.status,
+          archivedAt: existing.archivedAt?.toISOString() ?? null,
+          lockVersion: existing.lockVersion,
+        },
+
+        after: {
+          status: archived.status,
+          archivedAt: archived.archivedAt?.toISOString() ?? null,
+          lockVersion: archived.lockVersion,
+        },
+      },
+    });
+
+    return {
+      ...archived,
+
+      categories: archived.categories.map(({ category }) => category),
     };
   });
 }

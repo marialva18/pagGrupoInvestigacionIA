@@ -1,5 +1,6 @@
 import express, { type Router } from 'express';
 import {
+  archiveNewsHandler,
   createNewsHandler,
   getNewsByIdHandler,
   listNewsHandler,
@@ -12,3 +13,4 @@ newsRouter.get('/', listNewsHandler);
 newsRouter.get('/:newsId', getNewsByIdHandler);
 newsRouter.post('/', createNewsHandler);
 newsRouter.patch('/:newsId', updateNewsHandler);
+newsRouter.delete('/:newsId', archiveNewsHandler);

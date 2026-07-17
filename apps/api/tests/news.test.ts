@@ -239,3 +239,19 @@ test('rejects an invalid identifier when restoring news', async () => {
     assert.equal(body.error.code, 'NEWS_INVALID_ID');
   });
 });
+
+test('rejects an invalid identifier when listing revisions', async () => {
+  await withApiServer(async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/editor/news/not-a-uuid/revisions`);
+
+    assert.equal(response.status, 400);
+
+    const body = (await response.json()) as {
+      error: {
+        code: string;
+      };
+    };
+
+    assert.equal(body.error.code, 'NEWS_INVALID_ID');
+  });
+});

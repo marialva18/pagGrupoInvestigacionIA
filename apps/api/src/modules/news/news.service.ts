@@ -1584,3 +1584,120 @@ export async function restoreNews(newsId: string, input: RestoreNewsInput) {
     };
   });
 }
+
+export async function listNewsRevisions(newsId: string) {
+  const prisma = getPrismaClient();
+
+  const editor = await prisma.user.findUnique({
+    where: {
+      id: env.DEV_EDITOR_USER_ID,
+    },
+    select: {
+      id: true,
+      role: true,
+      status: true,
+    },
+  });
+
+  if (!editor || editor.status !== 'ACTIVE' || !['ADMIN', 'EDITOR'].includes(editor.role)) {
+    throw new AppError(
+      'El editor local no existe o no está activo.',
+      503,
+      'DEVELOPMENT_EDITOR_NOT_AVAILABLE',
+    );
+  }
+
+  const accessCondition =
+    editor.role === 'ADMIN'
+      ? {}
+      : {
+          OR: [
+            {
+              createdById: editor.id,
+            },
+            {
+              assignedEditorId: editor.id,
+            },
+          ],
+        };
+
+  const content = await prisma.contentItem.findFirst({
+    where: {
+      AND: [
+        {
+          id: newsId,
+        },
+        {
+          type: 'NEWS',
+        },
+        accessCondition,
+      ],
+    },
+    select: {
+      id: true,
+      status: true,
+      lockVersion: true,
+      title: true,
+    },
+  });
+
+  if (!content) {
+    throw new AppError('No se encontró la noticia solicitada.', 404, 'NEWS_NOT_FOUND');
+  }
+
+  const revisions = await prisma.contentRevision.findMany({
+    where: {
+      contentId: newsId,
+    },
+    orderBy: {
+      version: 'desc',
+    },
+    select: {
+      id: true,
+      version: true,
+      status: true,
+      sourceLockVersion: true,
+      snapshot: true,
+      changeSummary: true,
+      publishedAt: true,
+      createdAt: true,
+      updatedAt: true,
+
+      createdBy: {
+        select: {
+          id: true,
+          displayName: true,
+        },
+      },
+
+      reviewedBy: {
+        select: {
+          id: true,
+          displayName: true,
+        },
+      },
+
+      approvedBy: {
+        select: {
+          id: true,
+          displayName: true,
+        },
+      },
+
+      publishedBy: {
+        select: {
+          id: true,
+          displayName: true,
+        },
+      },
+    },
+  });
+
+  return {
+    contentId: content.id,
+    title: content.title,
+    publicStatus: content.status,
+    publicLockVersion: content.lockVersion,
+    items: revisions,
+  };
+}

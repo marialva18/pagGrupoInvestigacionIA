@@ -136,7 +136,7 @@ services:
       POSTGRES_USER: intgarti
       POSTGRES_PASSWORD: intgarti_dev
     ports:
-      - "55432:5432"
+      - '55432:5432'
     healthcheck:
       test:
         - CMD-SHELL

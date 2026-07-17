@@ -1,8 +1,8 @@
 # Sistema visual aprobado
 
-## TipografÃ­as
+## Tipografías
 
-- TÃ­tulos: Source Serif 4.
+- Títulos: Source Serif 4.
 - Interfaz y lectura: Source Sans 3.
 
 ## Paleta
@@ -16,13 +16,13 @@
 - Blanco: `#FFFFFF`
 - Texto: `#1E252B`
 - Gris: `#69727A`
-- LÃ­nea: `#D9D6CF`
+- Línea: `#D9D6CF`
 
-## DirecciÃ³n
+## Dirección
 
 - Header vino.
 - Footer azul.
-- Noticias como nÃºcleo.
+- Noticias como núcleo.
 - Contacto independiente.
 - Sin gradientes ni efectos decorativos.
-- DiseÃ±o responsive para celular.
+- Diseño responsive para celular.

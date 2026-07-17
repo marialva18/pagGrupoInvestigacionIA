@@ -1,6 +1,6 @@
 # Plataforma Web INTGARTI
 
-Portal acadÃ©mico e informativo del Grupo de InvestigaciÃ³n en Inteligencia Artificial de la FISI - UNMSM.
+Portal académico e informativo del Grupo de Investigación en Inteligencia Artificial de la FISI - UNMSM.
 
 ## Arquitectura
 
@@ -8,18 +8,18 @@ Portal acadÃ©mico e informativo del Grupo de InvestigaciÃ³n en Inteligencia 
 apps/
   web/       Frontend Astro + React
   api/       Backend REST Express
-  worker/    Procesos asÃ­ncronos
+  worker/    Procesos asíncronos
 
 packages/
   contracts/ Tipos y esquemas compartidos
   database/  Prisma y PostgreSQL
-  config/    ConfiguraciÃ³n comÃºn
+  config/    Configuración común
 ```
 
-La comunicaciÃ³n entre frontend y backend se realiza exclusivamente mediante HTTP y JSON:
+La comunicación entre frontend y backend se realiza exclusivamente mediante HTTP y JSON:
 
 ```text
-Web â†’ /api/v1 â†’ API â†’ Prisma â†’ PostgreSQL
+Web → /api/v1 → API → Prisma → PostgreSQL
 ```
 
 ## Stack
@@ -33,7 +33,7 @@ Web â†’ /api/v1 â†’ API â†’ Prisma â†’ PostgreSQL
 - pnpm workspace + Turborepo.
 - Docker Compose.
 
-## EjecuciÃ³n local con Node
+## Ejecución local con Node
 
 ```powershell
 Copy-Item .env.example .env
@@ -41,13 +41,13 @@ pnpm install
 pnpm dev
 ```
 
-## EjecuciÃ³n portable con Docker
+## Ejecución portable con Docker
 
 ```powershell
 docker compose up --build
 ```
 
-Para sincronizaciÃ³n automÃ¡tica:
+Para sincronización automática:
 
 ```powershell
 docker compose up --watch
@@ -76,6 +76,6 @@ Nunca subir:
 - `.env`
 - claves de Mailjet
 - service role key de Supabase
-- contraseÃ±as
-- secretos de sesiÃ³n
-- cadenas reales de conexiÃ³n
+- contraseñas
+- secretos de sesión
+- cadenas reales de conexión

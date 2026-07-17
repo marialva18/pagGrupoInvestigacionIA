@@ -3,19 +3,19 @@
 Docker proporciona a todos los integrantes:
 
 - Node.js 24.
-- La misma versiÃ³n de pnpm.
+- La misma versión de pnpm.
 - Las mismas dependencias.
 - PostgreSQL local.
 - Mailpit para correo local.
 - Web, API y worker como servicios separados.
 
-## Primera ejecuciÃ³n
+## Primera ejecución
 
 ```powershell
 docker compose up --build
 ```
 
-## Desarrollo con sincronizaciÃ³n automÃ¡tica
+## Desarrollo con sincronización automática
 
 Requiere Docker Compose 2.22 o superior:
 
@@ -36,10 +36,10 @@ docker compose up --watch
 docker compose down
 ```
 
-## Borrar tambiÃ©n la base local
+## Borrar también la base local
 
 ```powershell
 docker compose down -v --remove-orphans
 ```
 
-La base PostgreSQL de Docker es para desarrollo. La nube utilizarÃ¡ Supabase PostgreSQL.
+La base PostgreSQL de Docker es para desarrollo. La nube utilizará Supabase PostgreSQL.

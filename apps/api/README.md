@@ -1,6 +1,6 @@
 # Backend REST
 
-TecnologÃ­as:
+Tecnologías:
 
 - Express
 - TypeScript
@@ -9,14 +9,14 @@ TecnologÃ­as:
 
 Responsabilidades:
 
-- ValidaciÃ³n real.
-- AutenticaciÃ³n.
+- Validación real.
+- Autenticación.
 - Roles y permisos.
 - Reglas de negocio.
 - Acceso a PostgreSQL.
 - URLs firmadas de Storage.
-- AuditorÃ­a.
-- AnalÃ­tica.
+- Auditoría.
+- Analítica.
 
 Base de rutas:
 

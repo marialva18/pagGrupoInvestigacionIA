@@ -1,11 +1,11 @@
-# ComunicaciÃ³n REST
+# Comunicación REST
 
-## SeparaciÃ³n
+## Separación
 
 ```text
 apps/web      FRONTEND
 apps/api      BACKEND REST
-apps/worker   PROCESOS ASÃNCRONOS
+apps/worker   PROCESOS ASÍNCRONOS
 ```
 
 Aunque compartan un repositorio, son procesos y despliegues diferentes.
@@ -14,31 +14,31 @@ Aunque compartan un repositorio, son procesos y despliegues diferentes.
 
 ```text
 Navegador
-  â†“
+  ↓
 Astro / React
-  â†“ HTTP + JSON
+  ↓ HTTP + JSON
 services/api
-  â†“
+  ↓
 Express /api/v1
-  â†“
+  ↓
 Controller
-  â†“
+  ↓
 Service
-  â†“
+  ↓
 Repository
-  â†“
+  ↓
 Prisma
-  â†“
+  ↓
 PostgreSQL
 ```
 
 ## Reglas
 
-- El frontend no importa cÃ³digo de `apps/api`.
+- El frontend no importa código de `apps/api`.
 - El frontend no usa Prisma.
 - El frontend no recibe claves privadas.
 - El backend vuelve a validar todos los datos.
-- La autorizaciÃ³n siempre se aplica en la API.
+- La autorización siempre se aplica en la API.
 - Los contratos reutilizables viven en `packages/contracts`.
 
 ## Rutas iniciales

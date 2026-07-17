@@ -3,7 +3,7 @@
 Procesos que no deben bloquear la API:
 
 - Mailjet.
-- Procesamiento de imÃ¡genes.
+- Procesamiento de imágenes.
 - Publicaciones programadas.
-- AgregaciÃ³n de analÃ­tica.
+- Agregación de analítica.
 - Ingesta de noticias externas.

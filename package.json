@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": "\u003e=24.0.0 \u003c27",
-    "pnpm": "\u003e=11.0.0 \u003c12"
+    "node": ">=24.0.0 <27",
+    "pnpm": ">=11.0.0 <12"
   },
   "scripts": {
     "dev": "turbo dev --parallel",
@@ -25,7 +25,10 @@
     "docker:watch": "docker compose up --watch",
     "docker:down": "docker compose down",
     "docker:reset": "docker compose down -v --remove-orphans",
-    "docker:logs": "docker compose logs -f"
+    "docker:logs": "docker compose logs -f",
+    "db:migrate": "pnpm --filter @intgarti/database prisma:migrate:dev",
+    "db:seed": "pnpm --filter @intgarti/database prisma:seed",
+    "db:studio": "pnpm --filter @intgarti/database prisma:studio"
   },
   "devDependencies": {
     "prettier": "latest",

@@ -5,7 +5,7 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./src/index.ts",
       "import": "./dist/index.js"
     }
   },
@@ -14,11 +14,17 @@
     "check": "tsc --noEmit",
     "lint": "eslint src prisma.config.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node -e \"console.log(\u0027Database tests pending\u0027)\"",
+    "test": "node -e \"console.log('Database tests pending')\"",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
     "prisma:format": "prisma format",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:seed": "prisma db seed",
+    "prebuild": "prisma generate",
+    "pretypecheck": "prisma generate",
+    "precheck": "prisma generate"
   },
   "dependencies": {
     "@prisma/adapter-pg": "latest",

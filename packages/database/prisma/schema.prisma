@@ -1,11 +1,345 @@
-// Sprint 0: el modelo se diseÃ±arÃ¡ antes de crear la primera migraciÃ³n.
-// No agregar tablas sin revisar reglas, permisos y relaciones.
-
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+  engineType          = "client"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  EDITOR
+}
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+enum ContentType {
+  NEWS
+  PAGE
+  EVENT
+}
+
+enum ContentStatus {
+  DRAFT
+  IN_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum StorageProvider {
+  MINIO
+  SUPABASE
+}
+
+enum MediaStatus {
+  PENDING
+  UPLOADING
+  PROCESSING
+  READY
+  REJECTED
+  ARCHIVED
+}
+
+enum MediaVariantKind {
+  ORIGINAL
+  THUMBNAIL
+  CARD
+  HERO
+  MOBILE
+}
+
+enum MediaRightsStatus {
+  PENDING
+  VERIFIED
+  RESTRICTED
+}
+
+enum ContentMediaRole {
+  COVER
+  INLINE
+  GALLERY
+  ATTACHMENT
+}
+
+enum AcademicSourceType {
+  DATABASE
+  JOURNAL
+  REPOSITORY
+  SEARCH_ENGINE
+  ORGANIZATION
+  OTHER
+}
+
+enum ContactStatus {
+  NEW
+  IN_REVIEW
+  RESPONDED
+  ARCHIVED
+  SPAM
+}
+
+enum EmailJobStatus {
+  PENDING
+  SENT
+  FAILED
+  RETRYING
+}
+
+model User {
+  id             String     @id @default(uuid()) @db.Uuid
+  email          String     @unique @db.VarChar(320)
+  displayName    String     @db.VarChar(160)
+  role           UserRole   @default(EDITOR)
+  status         UserStatus @default(INVITED)
+  authProviderId String?    @unique @db.VarChar(255)
+  lastLoginAt    DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  createdContents  ContentItem[] @relation("ContentCreatedBy")
+  assignedContents ContentItem[] @relation("ContentAssignedEditor")
+  reviewedContents ContentItem[] @relation("ContentReviewedBy")
+  approvedContents ContentItem[] @relation("ContentApprovedBy")
+  mediaAssets      MediaAsset[]
+  auditLogs        AuditLog[]
+
+  @@index([role, status])
+  @@index([createdAt])
+}
+
+model ContentItem {
+  id              String        @id @default(uuid()) @db.Uuid
+  type            ContentType
+  status          ContentStatus @default(DRAFT)
+  slug            String        @unique @db.VarChar(180)
+  title           String        @db.VarChar(220)
+  summary         String?
+  body            Json?
+  seoTitle        String?       @db.VarChar(70)
+  metaDescription String?       @db.VarChar(180)
+  featured        Boolean       @default(false)
+  lockVersion     Int           @default(1)
+  scheduledAt     DateTime?
+  publishedAt     DateTime?
+  archivedAt      DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  createdById      String  @db.Uuid
+  assignedEditorId String? @db.Uuid
+  reviewedById     String? @db.Uuid
+  approvedById     String? @db.Uuid
+  coverMediaId     String? @db.Uuid
+
+  createdBy User @relation("ContentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  assignedEditor User? @relation("ContentAssignedEditor", fields: [assignedEditorId], references: [id], onDelete: SetNull)
+
+  reviewedBy User? @relation("ContentReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  approvedBy User? @relation("ContentApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  coverMedia MediaAsset? @relation("ContentCoverMedia", fields: [coverMediaId], references: [id], onDelete: SetNull)
+
+  categories ContentCategory[]
+  media      ContentMedia[]
+
+  @@index([type, status])
+  @@index([status, publishedAt])
+  @@index([assignedEditorId, status])
+  @@index([featured, publishedAt])
+}
+
+model Category {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @db.VarChar(120)
+  slug        String   @unique @db.VarChar(140)
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  contents ContentCategory[]
+
+  @@index([active, name])
+}
+
+model ContentCategory {
+  contentId  String   @db.Uuid
+  categoryId String   @db.Uuid
+  createdAt  DateTime @default(now())
+
+  content ContentItem @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([contentId, categoryId])
+  @@index([categoryId])
+}
+
+model Member {
+  id            String   @id @default(uuid()) @db.Uuid
+  fullName      String   @db.VarChar(180)
+  roleTitle     String   @db.VarChar(180)
+  biography     String?
+  email         String?  @db.VarChar(320)
+  linkedinUrl   String?
+  orcidUrl      String?
+  photoMediaId  String?  @db.Uuid
+  isCoordinator Boolean  @default(false)
+  displayOrder  Int      @default(0)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  photoMedia MediaAsset? @relation("MemberPhoto", fields: [photoMediaId], references: [id], onDelete: SetNull)
+
+  @@index([active, displayOrder])
+}
+
+model AcademicSource {
+  id           String             @id @default(uuid()) @db.Uuid
+  name         String             @db.VarChar(180)
+  type         AcademicSourceType
+  url          String             @unique
+  description  String?
+  logoMediaId  String?            @db.Uuid
+  featured     Boolean            @default(false)
+  active       Boolean            @default(true)
+  displayOrder Int                @default(0)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  logoMedia MediaAsset? @relation("AcademicSourceLogo", fields: [logoMediaId], references: [id], onDelete: SetNull)
+
+  @@index([active, displayOrder])
+  @@index([type, active])
+}
+
+model MediaAsset {
+  id               String            @id @default(uuid()) @db.Uuid
+  provider         StorageProvider
+  bucket           String            @db.VarChar(120)
+  objectKey        String            @unique @db.VarChar(500)
+  originalFilename String            @db.VarChar(255)
+  mimeType         String            @db.VarChar(120)
+  extension        String            @db.VarChar(20)
+  sizeBytes        BigInt
+  width            Int?
+  height           Int?
+  checksumSha256   String?           @unique @db.VarChar(64)
+  altText          String?           @db.VarChar(300)
+  caption          String?
+  credit           String?           @db.VarChar(220)
+  sourceUrl        String?
+  rightsStatus     MediaRightsStatus @default(PENDING)
+  status           MediaStatus       @default(PENDING)
+  errorMessage     String?
+  createdById      String            @db.Uuid
+  archivedAt       DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  variants            MediaVariant[]
+  contentLinks        ContentMedia[]
+  coverFor            ContentItem[]    @relation("ContentCoverMedia")
+  memberPhotos        Member[]         @relation("MemberPhoto")
+  academicSourceLogos AcademicSource[] @relation("AcademicSourceLogo")
+
+  @@index([status, createdAt])
+  @@index([createdById, status])
+  @@index([provider, bucket])
+}
+
+model MediaVariant {
+  id           String           @id @default(uuid()) @db.Uuid
+  mediaAssetId String           @db.Uuid
+  kind         MediaVariantKind
+  objectKey    String           @unique @db.VarChar(500)
+  mimeType     String           @db.VarChar(120)
+  sizeBytes    BigInt
+  width        Int
+  height       Int
+  checksum     String?          @db.VarChar(64)
+  createdAt    DateTime         @default(now())
+
+  mediaAsset MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+
+  @@unique([mediaAssetId, kind])
+  @@index([mediaAssetId])
+}
+
+model ContentMedia {
+  id           String           @id @default(uuid()) @db.Uuid
+  contentId    String           @db.Uuid
+  mediaAssetId String           @db.Uuid
+  role         ContentMediaRole
+  position     Int              @default(0)
+  createdAt    DateTime         @default(now())
+
+  content ContentItem @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  mediaAsset MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
+
+  @@unique([contentId, mediaAssetId, role])
+  @@index([contentId, role, position])
+  @@index([mediaAssetId])
+}
+
+model ContactMessage {
+  id             String         @id @default(uuid()) @db.Uuid
+  name           String         @db.VarChar(180)
+  email          String         @db.VarChar(320)
+  subject        String         @db.VarChar(220)
+  message        String
+  sourcePath     String?        @db.VarChar(500)
+  status         ContactStatus  @default(NEW)
+  emailJobStatus EmailJobStatus @default(PENDING)
+  respondedAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([status, createdAt])
+  @@index([emailJobStatus, createdAt])
+}
+
+model AuditLog {
+  id         BigInt   @id @default(autoincrement())
+  actorId    String?  @db.Uuid
+  action     String   @db.VarChar(140)
+  entityType String   @db.VarChar(100)
+  entityId   String?  @db.VarChar(255)
+  reason     String?
+  before     Json?
+  after      Json?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId, createdAt])
+  @@index([action, createdAt])
+}
+
+model SiteSetting {
+  key         String   @id @db.VarChar(160)
+  value       Json
+  description String?
+  sensitive   Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
 }

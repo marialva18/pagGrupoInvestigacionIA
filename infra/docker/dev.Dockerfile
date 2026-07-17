@@ -19,5 +19,6 @@ COPY packages/database/package.json packages/database/package.json
 RUN pnpm install --frozen-lockfile
 
 COPY . .
+RUN pnpm --filter @intgarti/database build
 
 CMD ["pnpm", "dev"]

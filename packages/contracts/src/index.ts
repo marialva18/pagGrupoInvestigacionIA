@@ -14,7 +14,14 @@ export const contentStatusSchema = z.enum([
 ]);
 export type ContentStatus = z.infer<typeof contentStatusSchema>;
 
-export const mediaStatusSchema = z.enum(['PENDING', 'PROCESSING', 'READY', 'REJECTED', 'ARCHIVED']);
+export const mediaStatusSchema = z.enum([
+  'PENDING',
+  'UPLOADING',
+  'PROCESSING',
+  'READY',
+  'REJECTED',
+  'ARCHIVED',
+]);
 export type MediaStatus = z.infer<typeof mediaStatusSchema>;
 
 export const analyticsEventSchema = z.enum([

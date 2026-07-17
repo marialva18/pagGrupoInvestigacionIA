@@ -1,6 +1,6 @@
 # Frontend
 
-TecnologÃ­as:
+Tecnologías:
 
 - Astro
 - React Islands
@@ -10,12 +10,12 @@ TecnologÃ­as:
 
 Responsabilidades:
 
-- Landing pÃºblica.
+- Landing pública.
 - Noticias.
 - Contacto.
 - Panel editorial.
-- DiseÃ±o responsive.
-- ValidaciÃ³n visual.
+- Diseño responsive.
+- Validación visual.
 - Consumo de la API REST.
 
-No contiene Prisma, claves privadas ni reglas finales de autorizaciÃ³n.
+No contiene Prisma, claves privadas ni reglas finales de autorización.

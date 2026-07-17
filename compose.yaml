@@ -1,0 +1,156 @@
+name: intgarti
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/dev.Dockerfile
+      target: development
+    command:
+      - pnpm
+      - --filter
+      - '@intgarti/web'
+      - dev
+      - --host
+      - 0.0.0.0
+    environment:
+      PUBLIC_WEB_URL: http://localhost:4321
+      PUBLIC_API_URL: http://localhost:3001/api/v1
+      API_INTERNAL_URL: http://api:3001/api/v1
+    ports:
+      - '4321:4321'
+    depends_on:
+      api:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync
+          path: ./apps/web/src
+          target: /workspace/apps/web/src
+        - action: sync
+          path: ./apps/web/public
+          target: /workspace/apps/web/public
+        - action: rebuild
+          path: ./apps/web/package.json
+        - action: rebuild
+          path: ./packages/contracts
+        - action: rebuild
+          path: ./pnpm-lock.yaml
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/dev.Dockerfile
+      target: development
+    command:
+      - pnpm
+      - --filter
+      - '@intgarti/api'
+      - dev
+    environment:
+      NODE_ENV: development
+      API_PORT: '3001'
+      WEB_ORIGINS: http://localhost:4321
+      TRUST_PROXY: 'false'
+      LOG_LEVEL: info
+      DATABASE_URL: postgresql://intgarti:intgarti_dev@postgres:5432/intgarti?schema=public
+      DIRECT_URL: postgresql://intgarti:intgarti_dev@postgres:5432/intgarti?schema=public
+    ports:
+      - '3001:3001'
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://localhost:3001/api/v1/health').then((response)=>{if(!response.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 5s
+      timeout: 5s
+      retries: 15
+    depends_on:
+      postgres:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync
+          path: ./apps/api/src
+          target: /workspace/apps/api/src
+        - action: sync
+          path: ./packages/contracts/src
+          target: /workspace/packages/contracts/src
+        - action: sync
+          path: ./packages/database
+          target: /workspace/packages/database
+          ignore:
+            - generated/
+            - node_modules/
+        - action: rebuild
+          path: ./apps/api/package.json
+        - action: rebuild
+          path: ./pnpm-lock.yaml
+
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/dev.Dockerfile
+      target: development
+    command:
+      - pnpm
+      - --filter
+      - '@intgarti/worker'
+      - dev
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://intgarti:intgarti_dev@postgres:5432/intgarti?schema=public
+      DIRECT_URL: postgresql://intgarti:intgarti_dev@postgres:5432/intgarti?schema=public
+      MAILJET_API_KEY: ${MAILJET_API_KEY:-}
+      MAILJET_SECRET_KEY: ${MAILJET_SECRET_KEY:-}
+      MAILJET_SENDER_EMAIL: ${MAILJET_SENDER_EMAIL:-}
+      MAILJET_SENDER_NAME: ${MAILJET_SENDER_NAME:-INTGARTI}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync
+          path: ./apps/worker/src
+          target: /workspace/apps/worker/src
+        - action: sync
+          path: ./packages/contracts/src
+          target: /workspace/packages/contracts/src
+        - action: sync
+          path: ./packages/database
+          target: /workspace/packages/database
+          ignore:
+            - generated/
+            - node_modules/
+        - action: rebuild
+          path: ./apps/worker/package.json
+        - action: rebuild
+          path: ./pnpm-lock.yaml
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: intgarti
+      POSTGRES_USER: intgarti
+      POSTGRES_PASSWORD: intgarti_dev
+    ports:
+      - '55432:5432'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 5s
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - '1025:1025'
+      - '8025:8025'
+
+volumes:
+  intgarti_postgres_data:

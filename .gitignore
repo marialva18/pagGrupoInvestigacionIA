@@ -11,3 +11,27 @@ coverage/
 *.log
 .DS_Store
 Thumbs.db
+
+# INTGARTI monorepo
+.pnpm-store/
+generated/
+tmp/
+temp/
+*.tmp
+
+# Astro
+.astro/
+
+# Turborepo
+.turbo/
+
+# Tests
+coverage/
+
+# Editors
+.vscode/
+.idea/
+
+# Prisma local
+*.db
+*.db-journal

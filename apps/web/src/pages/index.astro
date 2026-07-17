@@ -1,0 +1,581 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Footer from '../components/public/Footer.astro';
+import Header from '../components/public/Header.astro';
+
+const recentNews = [
+  {
+    category: 'Investigación',
+    date: '16 JUL 2026',
+    title: 'Explora publicaciones recientes desde fuentes especializadas.',
+  },
+  {
+    category: 'INTGARTI',
+    date: '15 JUL 2026',
+    title: 'Información institucional y líneas de investigación en una sola vista.',
+  },
+  {
+    category: 'Actualidad',
+    date: '14 JUL 2026',
+    title: 'Noticias externas enlazadas a su publicación original.',
+  },
+];
+
+const sources = ['IEEE Xplore', 'ACM Digital Library', 'arXiv', 'Semantic Scholar'];
+---
+
+<BaseLayout>
+  <Header />
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <span class="eyebrow">Facultad de Ingeniería de Sistemas e Informática · UNMSM</span>
+        <h1>
+          INTGARTI
+          <small>Grupo de Investigación en Inteligencia Artificial</small>
+        </h1>
+        <p>
+          Información institucional, actividades, publicaciones y recursos académicos para la
+          comunidad universitaria.
+        </p>
+        <div class="hero-actions">
+          <a class="button primary" href="/noticias">Ver noticias</a>
+          <a class="button secondary" href="/grupo">Conocer el grupo</a>
+        </div>
+      </div>
+
+      <div class="hero-photo">
+        <strong>Fotografía institucional</strong>
+        <span>Se cargará desde Supabase Storage.</span>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="section-heading">
+          <div>
+            <span class="label">Noticias y publicaciones</span>
+            <h2>Información reciente, ordenada por relevancia.</h2>
+          </div>
+          <a class="history-link" href="/noticias">Ver historial de noticias →</a>
+        </div>
+
+        <div class="news-layout">
+          <article class="featured-news">
+            <span>Publicación destacada</span>
+            <h3>Noticias, investigación y comunidad académica.</h3>
+            <p>
+              La publicación destacada será seleccionada desde el espacio editorial y obtenida
+              mediante la API.
+            </p>
+          </article>
+
+          <div class="news-list">
+            {
+              recentNews.map((item) => (
+                <article>
+                  <div>
+                    <span>{item.category}</span>
+                    <time>{item.date}</time>
+                  </div>
+                  <h3>{item.title}</h3>
+                </article>
+              ))
+            }
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section sources">
+      <div class="container">
+        <span class="label light">Explora investigación</span>
+        <h2>Busca publicaciones en fuentes académicas.</h2>
+        <p>Las fuentes, descripciones y enlaces se administrarán desde la base de datos.</p>
+
+        <div class="source-grid">
+          {
+            sources.map((source, index) => (
+              <article>
+                <span>0{index + 1}</span>
+                <h3>{source}</h3>
+                <p>Fuente académica configurable desde el panel administrativo.</p>
+              </article>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+
+    <section class="section ivory">
+      <div class="container split">
+        <div>
+          <span class="label">Sobre INTGARTI</span>
+          <h2>Investigación organizada y aplicada.</h2>
+        </div>
+        <div class="lines">
+          <p>El contenido institucional procederá de la API y podrá editarse con permisos.</p>
+          <div>Ciberseguridad</div>
+          <div>Gobierno y Gestión de TIC</div>
+          <div>Sistemas Inteligentes</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <span class="label">Miembros</span>
+        <h2>Coordinación y equipo de investigación.</h2>
+
+        <div class="member-layout">
+          <div class="member-photo">Fotografía del coordinador</div>
+          <div class="member-list">
+            <article>
+              <strong>Coordinador de INTGARTI</strong>
+              <span>Perfil administrable desde la base de datos.</span>
+            </article>
+            <article>
+              <strong>Miembros titulares</strong>
+              <span>Directorio, grados y enlaces académicos.</span>
+            </article>
+            <article>
+              <strong>Perfiles académicos</strong>
+              <span>ORCID, Google Scholar y otros enlaces.</span>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section ivory">
+      <div class="container">
+        <span class="label">Contacto</span>
+        <h2>Consultas y colaboración académica.</h2>
+
+        <div class="contact-layout">
+          <form>
+            <label>
+              Nombre
+              <input type="text" disabled />
+            </label>
+            <label>
+              Correo
+              <input type="email" disabled />
+            </label>
+            <label class="full">
+              Mensaje
+              <textarea rows="5" disabled></textarea>
+            </label>
+            <button class="button primary" type="button" disabled>Enviar consulta</button>
+          </form>
+
+          <aside>
+            <h3>Información institucional</h3>
+            <p>El correo, teléfono, oficina y ubicación se cargarán desde configuración.</p>
+          </aside>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer />
+</BaseLayout>
+
+<style>
+  .hero {
+    display: grid;
+    min-height: 650px;
+    grid-template-columns: minmax(0, 0.92fr) minmax(480px, 1.08fr);
+    background: var(--color-ivory);
+  }
+
+  .hero-copy {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 76px 70px 82px max(24px, calc((100vw - var(--content-width)) / 2));
+  }
+
+  .eyebrow,
+  .label {
+    display: block;
+    margin-bottom: 18px;
+    color: var(--color-burgundy);
+    font-size: 0.73rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  h1,
+  h2,
+  h3 {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-weight: 500;
+  }
+
+  h1 {
+    color: var(--color-navy);
+    font-size: clamp(4rem, 7vw, 7rem);
+    letter-spacing: -0.055em;
+    line-height: 0.88;
+  }
+
+  h1 small {
+    display: block;
+    max-width: 580px;
+    margin-top: 26px;
+    font-family: var(--font-body);
+    font-size: 0.22em;
+    font-weight: 600;
+    letter-spacing: 0;
+    line-height: 1.28;
+  }
+
+  .hero-copy > p {
+    max-width: 620px;
+    margin: 26px 0 34px;
+    color: var(--color-muted);
+    font-size: 1.08rem;
+  }
+
+  .hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+
+  .button {
+    display: inline-flex;
+    min-height: 48px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 22px;
+    border: 1px solid transparent;
+    border-radius: 0;
+    font-weight: 700;
+  }
+
+  .primary {
+    color: var(--color-white);
+    background: var(--color-burgundy);
+  }
+
+  .secondary {
+    color: var(--color-navy);
+    border-color: var(--color-navy);
+  }
+
+  .hero-photo,
+  .member-photo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    color: rgb(255 255 255 / 75%);
+    background: var(--color-navy-medium);
+  }
+
+  .hero-photo span {
+    margin-top: 8px;
+    font-size: 0.82rem;
+    opacity: 0.72;
+  }
+
+  .section {
+    padding: 102px 0;
+  }
+
+  .section-heading {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 32px;
+    margin-bottom: 46px;
+  }
+
+  h2 {
+    max-width: 780px;
+    color: var(--color-navy);
+    font-size: clamp(2.4rem, 4.2vw, 4.4rem);
+    letter-spacing: -0.04em;
+    line-height: 1;
+  }
+
+  .history-link {
+    padding-bottom: 4px;
+    border-bottom: 1px solid currentColor;
+    color: var(--color-navy);
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .news-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.5fr);
+    gap: 34px;
+  }
+
+  .featured-news {
+    min-height: 500px;
+    padding: 48px;
+    color: var(--color-white);
+    background: var(--color-navy);
+  }
+
+  .featured-news > span {
+    color: #d9bb83;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+
+  .featured-news h3 {
+    max-width: 650px;
+    margin-top: 125px;
+    font-size: clamp(2.6rem, 4vw, 4.4rem);
+    letter-spacing: -0.04em;
+    line-height: 1;
+  }
+
+  .featured-news p {
+    max-width: 570px;
+    color: rgb(255 255 255 / 68%);
+  }
+
+  .news-list {
+    border-top: 1px solid var(--color-line);
+  }
+
+  .news-list article {
+    padding: 25px 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .news-list article > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    color: var(--color-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .news-list h3 {
+    margin-top: 10px;
+    color: var(--color-navy);
+    font-size: 1.5rem;
+    line-height: 1.15;
+  }
+
+  .sources {
+    color: var(--color-white);
+    background: var(--color-navy);
+  }
+
+  .sources h2 {
+    color: var(--color-white);
+  }
+
+  .sources > .container > p {
+    max-width: 680px;
+    color: rgb(255 255 255 / 68%);
+  }
+
+  .light {
+    color: #d9bb83;
+  }
+
+  .source-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    margin-top: 46px;
+  }
+
+  .source-grid article {
+    display: flex;
+    min-height: 340px;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 30px;
+    background: var(--color-navy-medium);
+  }
+
+  .source-grid article:first-child {
+    background: var(--color-burgundy);
+  }
+
+  .source-grid article:nth-child(3) {
+    color: var(--color-text);
+    background: var(--color-ivory);
+  }
+
+  .source-grid article > span {
+    margin-bottom: auto;
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+
+  .source-grid h3 {
+    font-size: 2rem;
+  }
+
+  .source-grid p {
+    opacity: 0.7;
+  }
+
+  .ivory {
+    background: var(--color-ivory);
+  }
+
+  .split {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: 80px;
+  }
+
+  .lines {
+    color: var(--color-muted);
+  }
+
+  .lines div {
+    padding: 20px 0;
+    border-bottom: 1px solid var(--color-line);
+    color: var(--color-navy);
+    font-family: var(--font-heading);
+    font-size: 1.4rem;
+  }
+
+  .member-layout {
+    display: grid;
+    grid-template-columns: minmax(320px, 0.8fr) minmax(0, 1.2fr);
+    gap: 64px;
+    margin-top: 48px;
+  }
+
+  .member-photo {
+    min-height: 500px;
+  }
+
+  .member-list {
+    border-top: 1px solid var(--color-line);
+  }
+
+  .member-list article {
+    display: grid;
+    padding: 25px 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .member-list strong {
+    color: var(--color-navy);
+    font-family: var(--font-heading);
+    font-size: 1.35rem;
+    font-weight: 500;
+  }
+
+  .member-list span {
+    color: var(--color-muted);
+  }
+
+  .contact-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(350px, 0.9fr);
+    gap: 68px;
+    margin-top: 46px;
+  }
+
+  form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+  }
+
+  label {
+    display: grid;
+    gap: 7px;
+    color: var(--color-navy);
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+
+  input,
+  textarea {
+    width: 100%;
+    padding: 11px 0;
+    border: 0;
+    border-bottom: 1px solid #aaa59d;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .full {
+    grid-column: 1 / -1;
+  }
+
+  form button {
+    width: max-content;
+  }
+
+  aside {
+    padding: 38px;
+    color: rgb(255 255 255 / 72%);
+    background: var(--color-navy);
+  }
+
+  aside h3 {
+    color: var(--color-white);
+    font-size: 2rem;
+  }
+
+  @media (max-width: 900px) {
+    .hero,
+    .news-layout,
+    .split,
+    .member-layout,
+    .contact-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .hero-photo {
+      min-height: 480px;
+    }
+
+    .source-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 640px) {
+    .hero-copy {
+      padding: 64px 22px;
+    }
+
+    .hero-photo {
+      min-height: 380px;
+    }
+
+    .section {
+      padding: 76px 0;
+    }
+
+    .section-heading {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    .source-grid,
+    form {
+      grid-template-columns: 1fr;
+    }
+
+    .full {
+      grid-column: auto;
+    }
+  }
+</style>

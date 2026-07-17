@@ -1,0 +1,17 @@
+:root {
+  --color-burgundy: #772536;
+  --color-burgundy-dark: #571a27;
+  --color-navy: #14263a;
+  --color-navy-medium: #203a55;
+  --color-gold: #b68b46;
+  --color-ivory: #f5f2eb;
+  --color-white: #ffffff;
+  --color-text: #1e252b;
+  --color-muted: #69727a;
+  --color-line: #d9d6cf;
+
+  --font-heading: 'Source Serif 4', Georgia, serif;
+  --font-body: 'Source Sans 3', Arial, sans-serif;
+
+  --content-width: 1240px;
+}

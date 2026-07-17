@@ -1,0 +1,38 @@
+{
+  "name": "intgarti-platform",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": "\u003e=24.0.0 \u003c27",
+    "pnpm": "\u003e=11.0.0 \u003c12"
+  },
+  "scripts": {
+    "dev": "turbo dev --parallel",
+    "dev:web": "pnpm --filter @intgarti/web dev",
+    "dev:api": "pnpm --filter @intgarti/api dev",
+    "dev:worker": "pnpm --filter @intgarti/worker dev",
+    "build": "turbo build",
+    "check": "turbo check",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:generate": "pnpm --filter @intgarti/database prisma:generate",
+    "db:validate": "pnpm --filter @intgarti/database prisma:validate",
+    "db:format": "pnpm --filter @intgarti/database prisma:format",
+    "docker:up": "docker compose up --build",
+    "docker:watch": "docker compose up --watch",
+    "docker:down": "docker compose down",
+    "docker:reset": "docker compose down -v --remove-orphans",
+    "docker:logs": "docker compose logs -f"
+  },
+  "devDependencies": {
+    "prettier": "latest",
+    "turbo": "latest",
+    "typescript": "6.0.3",
+    "@types/node": "^26.1.1",
+    "prettier-plugin-astro": "^0.14.1"
+  },
+  "packageManager": "pnpm@11.13.1"
+}

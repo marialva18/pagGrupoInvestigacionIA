@@ -1,0 +1,82 @@
+---
+const links = [
+  { href: '/', label: 'Inicio' },
+  { href: '/noticias', label: 'Noticias' },
+  { href: '/fuentes-academicas', label: 'Fuentes académicas' },
+  { href: '/grupo', label: 'El grupo' },
+  { href: '/miembros', label: 'Miembros' },
+  { href: '/contacto', label: 'Contacto' },
+];
+---
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href="/" aria-label="Ir al inicio">
+      <small>FISI · UNMSM</small>
+      <strong>INTGARTI</strong>
+    </a>
+
+    <nav aria-label="Navegación principal">
+      {links.map((link) => <a href={link.href}>{link.label}</a>)}
+    </nav>
+
+    <a class="editor-access" href="/acceso">Acceso editorial</a>
+  </div>
+</header>
+
+<style>
+  .site-header {
+    position: sticky;
+    z-index: 50;
+    top: 0;
+    color: var(--color-white);
+    background: var(--color-burgundy);
+    border-bottom: 1px solid rgb(255 255 255 / 20%);
+  }
+
+  .header-inner {
+    display: flex;
+    min-height: 88px;
+    align-items: center;
+    gap: 30px;
+  }
+
+  .brand {
+    display: grid;
+    margin-right: auto;
+    line-height: 1;
+  }
+
+  .brand small {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+  }
+
+  .brand strong {
+    margin-top: 7px;
+    font-family: var(--font-heading);
+    font-size: 1.55rem;
+    font-weight: 500;
+  }
+
+  nav {
+    display: flex;
+    gap: 24px;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .editor-access {
+    padding-bottom: 3px;
+    border-bottom: 1px solid currentColor;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+
+  @media (max-width: 980px) {
+    nav {
+      display: none;
+    }
+  }
+</style>

@@ -1,0 +1,11 @@
+// Sprint 0: el modelo se diseÃ±arÃ¡ antes de crear la primera migraciÃ³n.
+// No agregar tablas sin revisar reglas, permisos y relaciones.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}

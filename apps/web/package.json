@@ -1,0 +1,38 @@
+{
+  "name": "@intgarti/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro check \u0026\u0026 astro build",
+    "preview": "astro preview",
+    "check": "astro check",
+    "lint": "eslint .",
+    "typecheck": "astro check",
+    "test": "node -e \"console.log(\u0027Web tests pending\u0027)\""
+  },
+  "dependencies": {
+    "@astrojs/react": "latest",
+    "@fontsource/source-sans-3": "latest",
+    "@fontsource/source-serif-4": "latest",
+    "@intgarti/contracts": "workspace:*",
+    "@tailwindcss/vite": "latest",
+    "astro": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "tailwindcss": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@astrojs/check": "latest",
+    "@eslint/js": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "eslint": "latest",
+    "eslint-plugin-astro": "latest",
+    "prettier-plugin-astro": "latest",
+    "typescript-eslint": "latest",
+    "typescript": "6.0.3"
+  }
+}

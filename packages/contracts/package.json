@@ -1,0 +1,28 @@
+{
+  "name": "@intgarti/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc --noEmit",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "node -e \"console.log(\u0027Contract tests pending\u0027)\""
+  },
+  "devDependencies": {
+    "@eslint/js": "latest",
+    "eslint": "latest",
+    "typescript-eslint": "latest",
+    "typescript": "6.0.3"
+  },
+  "dependencies": {
+    "zod": "latest"
+  }
+}

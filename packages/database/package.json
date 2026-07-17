@@ -1,0 +1,39 @@
+{
+  "name": "@intgarti/database",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc --noEmit",
+    "lint": "eslint src prisma.config.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node -e \"console.log(\u0027Database tests pending\u0027)\"",
+    "prisma:generate": "prisma generate",
+    "prisma:validate": "prisma validate",
+    "prisma:format": "prisma format",
+    "prisma:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "latest",
+    "@prisma/client": "latest",
+    "dotenv": "latest",
+    "pg": "latest"
+  },
+  "devDependencies": {
+    "@eslint/js": "latest",
+    "@types/node": "latest",
+    "@types/pg": "latest",
+    "eslint": "latest",
+    "prisma": "latest",
+    "tsx": "latest",
+    "typescript-eslint": "latest",
+    "typescript": "6.0.3"
+  }
+}

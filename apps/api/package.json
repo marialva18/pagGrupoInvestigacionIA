@@ -1,0 +1,39 @@
+{
+  "name": "@intgarti/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "check": "tsc --noEmit",
+    "lint": "eslint src tests",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/health.test.ts"
+  },
+  "dependencies": {
+    "@intgarti/contracts": "workspace:*",
+    "@intgarti/database": "workspace:*",
+    "compression": "latest",
+    "cors": "latest",
+    "dotenv": "latest",
+    "express": "latest",
+    "express-rate-limit": "latest",
+    "helmet": "latest",
+    "pino": "latest",
+    "pino-http": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@eslint/js": "latest",
+    "@types/compression": "latest",
+    "@types/cors": "latest",
+    "@types/express": "latest",
+    "@types/node": "latest",
+    "eslint": "latest",
+    "tsx": "latest",
+    "typescript-eslint": "latest",
+    "typescript": "6.0.3"
+  }
+}

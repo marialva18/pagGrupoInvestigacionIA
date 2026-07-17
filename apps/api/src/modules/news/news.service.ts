@@ -614,6 +614,18 @@ export async function getNewsById(newsId: string) {
   };
 }
 
+type NewsRevisionSnapshot = {
+  slug: string;
+  title: string;
+  summary: string;
+  body: NonNullable<UpdateNewsInput['body']>;
+  seoTitle: string | null;
+  metaDescription: string | null;
+  featured: boolean;
+  coverMediaId: string | null;
+  categoryIds: string[];
+};
+
 export async function updateNews(newsId: string, input: UpdateNewsInput) {
   const prisma = getPrismaClient();
 
@@ -675,6 +687,11 @@ export async function updateNews(newsId: string, input: UpdateNewsInput) {
         featured: true,
         lockVersion: true,
         coverMediaId: true,
+        scheduledAt: true,
+        publishedAt: true,
+        archivedAt: true,
+        createdAt: true,
+        updatedAt: true,
 
         categories: {
           select: {
@@ -693,6 +710,14 @@ export async function updateNews(newsId: string, input: UpdateNewsInput) {
         'La noticia fue modificada por otro usuario. Actualiza la página antes de volver a guardar.',
         409,
         'NEWS_VERSION_CONFLICT',
+      );
+    }
+
+    if (existing.status === 'ARCHIVED') {
+      throw new AppError(
+        'La noticia está archivada. Debes restaurarla antes de editarla.',
+        409,
+        'NEWS_ARCHIVED_READ_ONLY',
       );
     }
 
@@ -768,6 +793,218 @@ export async function updateNews(newsId: string, input: UpdateNewsInput) {
       }
     }
 
+    /*
+     * Una noticia publicada no se modifica directamente.
+     * Se crea o actualiza una revisión editorial.
+     */
+    if (existing.status === 'PUBLISHED') {
+      const activeRevision = await transaction.contentRevision.findFirst({
+        where: {
+          contentId: newsId,
+          status: {
+            in: ['DRAFT', 'CHANGES_REQUESTED'],
+          },
+        },
+        orderBy: {
+          version: 'desc',
+        },
+        select: {
+          id: true,
+          version: true,
+          status: true,
+          snapshot: true,
+          changeSummary: true,
+        },
+      });
+
+      const activeSnapshot = activeRevision?.snapshot as NewsRevisionSnapshot | undefined;
+
+      const snapshot: NewsRevisionSnapshot = {
+        slug: updatedSlug ?? activeSnapshot?.slug ?? existing.slug,
+
+        title: input.title?.trim() ?? activeSnapshot?.title ?? existing.title,
+
+        summary: input.summary?.trim() ?? activeSnapshot?.summary ?? existing.summary ?? '',
+
+        body: input.body ??
+          activeSnapshot?.body ??
+          (existing.body as NonNullable<UpdateNewsInput['body']> | null) ?? {
+            version: 1,
+            blocks: [],
+          },
+
+        seoTitle:
+          input.seoTitle !== undefined
+            ? input.seoTitle === null
+              ? null
+              : input.seoTitle.trim()
+            : (activeSnapshot?.seoTitle ?? existing.seoTitle),
+
+        metaDescription:
+          input.metaDescription !== undefined
+            ? input.metaDescription === null
+              ? null
+              : input.metaDescription.trim()
+            : (activeSnapshot?.metaDescription ?? existing.metaDescription),
+
+        featured: activeSnapshot?.featured ?? existing.featured,
+
+        coverMediaId: input.coverMediaId ?? activeSnapshot?.coverMediaId ?? existing.coverMediaId,
+
+        categoryIds:
+          input.categoryIds ??
+          activeSnapshot?.categoryIds ??
+          existing.categories.map(({ categoryId }) => categoryId),
+      };
+
+      const lockTransition = await transaction.contentItem.updateMany({
+        where: {
+          id: newsId,
+          lockVersion: input.lockVersion,
+          status: 'PUBLISHED',
+        },
+        data: {
+          lockVersion: {
+            increment: 1,
+          },
+        },
+      });
+
+      if (lockTransition.count !== 1) {
+        throw new AppError(
+          'La noticia fue modificada durante la creación de la revisión.',
+          409,
+          'NEWS_VERSION_CONFLICT',
+        );
+      }
+
+      let auditAction: 'NEWS_REVISION_CREATED' | 'NEWS_REVISION_UPDATED';
+
+      let revision;
+
+      if (activeRevision) {
+        auditAction = 'NEWS_REVISION_UPDATED';
+
+        revision = await transaction.contentRevision.update({
+          where: {
+            id: activeRevision.id,
+          },
+          data: {
+            snapshot,
+            sourceLockVersion: input.lockVersion,
+
+            status: 'DRAFT',
+
+            changeSummary: input.changeSummary?.trim() ?? activeRevision.changeSummary,
+
+            reviewedById: null,
+            approvedById: null,
+            publishedById: null,
+            publishedAt: null,
+          },
+          select: {
+            id: true,
+            version: true,
+            status: true,
+            snapshot: true,
+            changeSummary: true,
+            sourceLockVersion: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+      } else {
+        auditAction = 'NEWS_REVISION_CREATED';
+
+        const latestRevision = await transaction.contentRevision.findFirst({
+          where: {
+            contentId: newsId,
+          },
+          orderBy: {
+            version: 'desc',
+          },
+          select: {
+            version: true,
+          },
+        });
+
+        revision = await transaction.contentRevision.create({
+          data: {
+            contentId: newsId,
+            version: (latestRevision?.version ?? 0) + 1,
+
+            status: 'DRAFT',
+            sourceLockVersion: input.lockVersion,
+
+            snapshot,
+
+            changeSummary: input.changeSummary?.trim() ?? null,
+
+            createdById: editor.id,
+          },
+          select: {
+            id: true,
+            version: true,
+            status: true,
+            snapshot: true,
+            changeSummary: true,
+            sourceLockVersion: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+      }
+
+      await transaction.auditLog.create({
+        data: {
+          actorId: editor.id,
+          action: auditAction,
+          entityType: 'ContentRevision',
+          entityId: revision.id,
+          reason: input.changeSummary?.trim() ?? null,
+
+          before: {
+            contentId: newsId,
+            publicStatus: existing.status,
+            publicLockVersion: existing.lockVersion,
+
+            activeRevisionId: activeRevision?.id ?? null,
+
+            activeRevisionVersion: activeRevision?.version ?? null,
+
+            activeRevisionSnapshot: activeRevision?.snapshot ?? null,
+          },
+
+          after: {
+            contentId: newsId,
+            publicStatus: existing.status,
+            publicLockVersion: existing.lockVersion + 1,
+
+            revisionId: revision.id,
+            revisionVersion: revision.version,
+            revisionStatus: revision.status,
+            revisionSnapshot: revision.snapshot,
+          },
+        },
+      });
+
+      return {
+        updateMode: 'REVISION' as const,
+        contentId: newsId,
+
+        publicStatus: existing.status,
+        publicLockVersion: existing.lockVersion + 1,
+
+        publishedContentUnchanged: true,
+
+        revision,
+      };
+    }
+
+    /*
+     * Contenido todavía no publicado:
+     * actualización directa normal.
+     */
     const transition = await transaction.contentItem.updateMany({
       where: {
         id: newsId,
@@ -966,7 +1203,9 @@ export async function updateNews(newsId: string, input: UpdateNewsInput) {
           seoTitle: existing.seoTitle,
           metaDescription: existing.metaDescription,
           coverMediaId: existing.coverMediaId,
+
           categoryIds: existing.categories.map(({ categoryId }) => categoryId),
+
           lockVersion: existing.lockVersion,
         },
 
@@ -977,14 +1216,18 @@ export async function updateNews(newsId: string, input: UpdateNewsInput) {
           body: updated.body,
           seoTitle: updated.seoTitle,
           metaDescription: updated.metaDescription,
+
           coverMediaId: updated.coverMedia?.id ?? null,
+
           categoryIds: updated.categories.map(({ category }) => category.id),
+
           lockVersion: updated.lockVersion,
         },
       },
     });
 
     return {
+      updateMode: 'DIRECT' as const,
       ...updated,
 
       categories: updated.categories.map(({ category }) => category),

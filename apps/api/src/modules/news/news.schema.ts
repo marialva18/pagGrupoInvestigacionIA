@@ -70,3 +70,66 @@ export type ListNewsInput = z.infer<typeof listNewsQuerySchema>;
 export const newsIdParamsSchema = z.object({
   newsId: z.string().uuid(),
 });
+
+export const updateNewsSchema = z
+  .object({
+    lockVersion: z.number().int().min(1),
+
+    title: z.string().trim().min(5).max(220).optional(),
+
+    slug: z
+      .string()
+      .trim()
+      .min(3)
+      .max(180)
+      .regex(
+        /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+        'El slug debe contener letras minúsculas, números y guiones.',
+      )
+      .optional(),
+
+    summary: z.string().trim().min(20).max(600).optional(),
+
+    body: z
+      .object({
+        version: z.number().int().positive().default(1),
+        blocks: z.array(newsBlockSchema).max(500),
+      })
+      .optional(),
+
+    categoryIds: z
+      .array(z.string().uuid())
+      .min(1)
+      .max(5)
+      .refine((categoryIds) => new Set(categoryIds).size === categoryIds.length, {
+        message: 'Las categorías no pueden repetirse.',
+      })
+      .optional(),
+
+    coverMediaId: z.string().uuid().optional(),
+
+    seoTitle: z.string().trim().min(5).max(70).nullable().optional(),
+
+    metaDescription: z.string().trim().min(20).max(180).nullable().optional(),
+  })
+  .superRefine((value, context) => {
+    const hasChanges = [
+      value.title,
+      value.slug,
+      value.summary,
+      value.body,
+      value.categoryIds,
+      value.coverMediaId,
+      value.seoTitle,
+      value.metaDescription,
+    ].some((field) => field !== undefined);
+
+    if (!hasChanges) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Debe enviar al menos un cambio.',
+      });
+    }
+  });
+
+export type UpdateNewsInput = z.infer<typeof updateNewsSchema>;

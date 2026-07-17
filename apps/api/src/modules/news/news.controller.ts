@@ -1,7 +1,12 @@
 import type { RequestHandler } from 'express';
 import { AppError } from '../../common/errors/app-error.js';
-import { createNewsSchema, listNewsQuerySchema, newsIdParamsSchema } from './news.schema.js';
-import { createNews, getNewsById, listNews } from './news.service.js';
+import {
+  createNewsSchema,
+  listNewsQuerySchema,
+  newsIdParamsSchema,
+  updateNewsSchema,
+} from './news.schema.js';
+import { createNews, getNewsById, listNews, updateNews } from './news.service.js';
 
 export const createNewsHandler: RequestHandler = (request, response, next) => {
   const parsed = createNewsSchema.safeParse(request.body);
@@ -55,6 +60,38 @@ export const getNewsByIdHandler: RequestHandler = (request, response, next) => {
   }
 
   void getNewsById(parsed.data.newsId)
+    .then((news) => {
+      response.status(200).json({
+        data: news,
+      });
+    })
+    .catch(next);
+};
+
+export const updateNewsHandler: RequestHandler = (request, response, next) => {
+  const parsedParams = newsIdParamsSchema.safeParse(request.params);
+
+  if (!parsedParams.success) {
+    next(new AppError('El identificador de la noticia no es válido.', 400, 'NEWS_INVALID_ID'));
+
+    return;
+  }
+
+  const parsedBody = updateNewsSchema.safeParse(request.body);
+
+  if (!parsedBody.success) {
+    next(
+      new AppError(
+        'Los datos para actualizar la noticia no son válidos.',
+        400,
+        'NEWS_UPDATE_INVALID_INPUT',
+      ),
+    );
+
+    return;
+  }
+
+  void updateNews(parsedParams.data.newsId, parsedBody.data)
     .then((news) => {
       response.status(200).json({
         data: news,

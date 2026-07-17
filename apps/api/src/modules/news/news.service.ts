@@ -794,19 +794,80 @@ export async function updateNews(newsId: string, input: UpdateNewsInput) {
     }
 
     /*
-     * Una noticia publicada no se modifica directamente.
-     * Se crea o actualiza una revisión editorial.
+     * Cuando una noticia ya está publicada:
+     * 1. Conservamos automáticamente su versión anterior.
+     * 2. Aplicamos el cambio de inmediato.
+     * 3. La noticia continúa publicada.
+     *
+     * El usuario solo necesita presionar Guardar cambios.
      */
+    let historyRevision: {
+      id: string;
+      version: number;
+      status: string;
+      snapshot: unknown;
+      changeSummary: string | null;
+      sourceLockVersion: number;
+      createdAt: Date;
+      updatedAt: Date;
+    } | null = null;
+
     if (existing.status === 'PUBLISHED') {
-      const activeRevision = await transaction.contentRevision.findFirst({
+      const previousSnapshot: NewsRevisionSnapshot = {
+        slug: existing.slug,
+        title: existing.title,
+        summary: existing.summary ?? '',
+        body: (existing.body as NonNullable<UpdateNewsInput['body']> | null) ?? {
+          version: 1,
+          blocks: [],
+        },
+        seoTitle: existing.seoTitle,
+        metaDescription: existing.metaDescription,
+        featured: existing.featured,
+        coverMediaId: existing.coverMediaId,
+        categoryIds: existing.categories.map(({ categoryId }) => categoryId),
+      };
+
+      const latestRevision = await transaction.contentRevision.findFirst({
         where: {
           contentId: newsId,
-          status: {
-            in: ['DRAFT', 'CHANGES_REQUESTED'],
-          },
         },
         orderBy: {
           version: 'desc',
+        },
+        select: {
+          version: true,
+        },
+      });
+
+      /*
+       * Las revisiones DRAFT creadas durante el prototipo anterior
+       * dejan de estar activas, pero no se eliminan.
+       */
+      await transaction.contentRevision.updateMany({
+        where: {
+          contentId: newsId,
+          status: {
+            in: ['DRAFT', 'IN_REVIEW', 'CHANGES_REQUESTED', 'APPROVED'],
+          },
+        },
+        data: {
+          status: 'ARCHIVED',
+        },
+      });
+
+      historyRevision = await transaction.contentRevision.create({
+        data: {
+          contentId: newsId,
+          version: (latestRevision?.version ?? 0) + 1,
+          status: 'SUPERSEDED',
+          sourceLockVersion: existing.lockVersion,
+          snapshot: previousSnapshot,
+          changeSummary:
+            input.changeSummary?.trim() ??
+            'Versión anterior guardada automáticamente antes de editar la publicación.',
+          createdById: editor.id,
+          publishedAt: existing.publishedAt,
         },
         select: {
           id: true,
@@ -814,196 +875,17 @@ export async function updateNews(newsId: string, input: UpdateNewsInput) {
           status: true,
           snapshot: true,
           changeSummary: true,
+          sourceLockVersion: true,
+          createdAt: true,
+          updatedAt: true,
         },
       });
-
-      const activeSnapshot = activeRevision?.snapshot as NewsRevisionSnapshot | undefined;
-
-      const snapshot: NewsRevisionSnapshot = {
-        slug: updatedSlug ?? activeSnapshot?.slug ?? existing.slug,
-
-        title: input.title?.trim() ?? activeSnapshot?.title ?? existing.title,
-
-        summary: input.summary?.trim() ?? activeSnapshot?.summary ?? existing.summary ?? '',
-
-        body: input.body ??
-          activeSnapshot?.body ??
-          (existing.body as NonNullable<UpdateNewsInput['body']> | null) ?? {
-            version: 1,
-            blocks: [],
-          },
-
-        seoTitle:
-          input.seoTitle !== undefined
-            ? input.seoTitle === null
-              ? null
-              : input.seoTitle.trim()
-            : (activeSnapshot?.seoTitle ?? existing.seoTitle),
-
-        metaDescription:
-          input.metaDescription !== undefined
-            ? input.metaDescription === null
-              ? null
-              : input.metaDescription.trim()
-            : (activeSnapshot?.metaDescription ?? existing.metaDescription),
-
-        featured: activeSnapshot?.featured ?? existing.featured,
-
-        coverMediaId: input.coverMediaId ?? activeSnapshot?.coverMediaId ?? existing.coverMediaId,
-
-        categoryIds:
-          input.categoryIds ??
-          activeSnapshot?.categoryIds ??
-          existing.categories.map(({ categoryId }) => categoryId),
-      };
-
-      const lockTransition = await transaction.contentItem.updateMany({
-        where: {
-          id: newsId,
-          lockVersion: input.lockVersion,
-          status: 'PUBLISHED',
-        },
-        data: {
-          lockVersion: {
-            increment: 1,
-          },
-        },
-      });
-
-      if (lockTransition.count !== 1) {
-        throw new AppError(
-          'La noticia fue modificada durante la creación de la revisión.',
-          409,
-          'NEWS_VERSION_CONFLICT',
-        );
-      }
-
-      let auditAction: 'NEWS_REVISION_CREATED' | 'NEWS_REVISION_UPDATED';
-
-      let revision;
-
-      if (activeRevision) {
-        auditAction = 'NEWS_REVISION_UPDATED';
-
-        revision = await transaction.contentRevision.update({
-          where: {
-            id: activeRevision.id,
-          },
-          data: {
-            snapshot,
-            sourceLockVersion: input.lockVersion,
-
-            status: 'DRAFT',
-
-            changeSummary: input.changeSummary?.trim() ?? activeRevision.changeSummary,
-
-            reviewedById: null,
-            approvedById: null,
-            publishedById: null,
-            publishedAt: null,
-          },
-          select: {
-            id: true,
-            version: true,
-            status: true,
-            snapshot: true,
-            changeSummary: true,
-            sourceLockVersion: true,
-            createdAt: true,
-            updatedAt: true,
-          },
-        });
-      } else {
-        auditAction = 'NEWS_REVISION_CREATED';
-
-        const latestRevision = await transaction.contentRevision.findFirst({
-          where: {
-            contentId: newsId,
-          },
-          orderBy: {
-            version: 'desc',
-          },
-          select: {
-            version: true,
-          },
-        });
-
-        revision = await transaction.contentRevision.create({
-          data: {
-            contentId: newsId,
-            version: (latestRevision?.version ?? 0) + 1,
-
-            status: 'DRAFT',
-            sourceLockVersion: input.lockVersion,
-
-            snapshot,
-
-            changeSummary: input.changeSummary?.trim() ?? null,
-
-            createdById: editor.id,
-          },
-          select: {
-            id: true,
-            version: true,
-            status: true,
-            snapshot: true,
-            changeSummary: true,
-            sourceLockVersion: true,
-            createdAt: true,
-            updatedAt: true,
-          },
-        });
-      }
-
-      await transaction.auditLog.create({
-        data: {
-          actorId: editor.id,
-          action: auditAction,
-          entityType: 'ContentRevision',
-          entityId: revision.id,
-          reason: input.changeSummary?.trim() ?? null,
-
-          before: {
-            contentId: newsId,
-            publicStatus: existing.status,
-            publicLockVersion: existing.lockVersion,
-
-            activeRevisionId: activeRevision?.id ?? null,
-
-            activeRevisionVersion: activeRevision?.version ?? null,
-
-            activeRevisionSnapshot: activeRevision?.snapshot ?? null,
-          },
-
-          after: {
-            contentId: newsId,
-            publicStatus: existing.status,
-            publicLockVersion: existing.lockVersion + 1,
-
-            revisionId: revision.id,
-            revisionVersion: revision.version,
-            revisionStatus: revision.status,
-            revisionSnapshot: revision.snapshot,
-          },
-        },
-      });
-
-      return {
-        updateMode: 'REVISION' as const,
-        contentId: newsId,
-
-        publicStatus: existing.status,
-        publicLockVersion: existing.lockVersion + 1,
-
-        publishedContentUnchanged: true,
-
-        revision,
-      };
     }
 
     /*
-     * Contenido todavía no publicado:
-     * actualización directa normal.
+     * Tanto el borrador como la publicación se actualizan
+     * directamente. En publicaciones, la versión anterior ya quedó
+     * protegida dentro del historial.
      */
     const transition = await transaction.contentItem.updateMany({
       where: {
@@ -1191,9 +1073,10 @@ export async function updateNews(newsId: string, input: UpdateNewsInput) {
     await transaction.auditLog.create({
       data: {
         actorId: editor.id,
-        action: 'NEWS_UPDATED',
+        action: existing.status === 'PUBLISHED' ? 'NEWS_PUBLISHED_UPDATED' : 'NEWS_UPDATED',
         entityType: 'ContentItem',
         entityId: newsId,
+        reason: input.changeSummary?.trim() ?? null,
 
         before: {
           slug: existing.slug,
@@ -1227,7 +1110,12 @@ export async function updateNews(newsId: string, input: UpdateNewsInput) {
     });
 
     return {
-      updateMode: 'DIRECT' as const,
+      updateMode:
+        existing.status === 'PUBLISHED' ? ('PUBLISHED_DIRECT' as const) : ('DIRECT' as const),
+
+      publishedContentUpdated: existing.status === 'PUBLISHED',
+
+      historyRevision,
       ...updated,
 
       categories: updated.categories.map(({ category }) => category),

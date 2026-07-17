@@ -1,20 +1,10 @@
 import 'dotenv/config';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '../generated/prisma/client.ts';
+import { getPrismaClient } from '../src/index.ts';
 
-const connectionString = process.env.DATABASE_URL;
+const prisma = getPrismaClient();
 
-if (!connectionString) {
-  throw new Error('DATABASE_URL is required to seed the database.');
-}
-
-const adapter = new PrismaPg({
-  connectionString,
-});
-
-const prisma = new PrismaClient({
-  adapter,
-});
+const developmentEditorId =
+  process.env.DEV_EDITOR_USER_ID ?? '00000000-0000-4000-8000-000000000001';
 
 const categories = [
   {
@@ -22,7 +12,7 @@ const categories = [
     slug: 'inteligencia-artificial',
   },
   {
-    name: 'Investigaci\u00f3n',
+    name: 'Investigación',
     slug: 'investigacion',
   },
   {
@@ -40,6 +30,25 @@ const categories = [
 ];
 
 async function main(): Promise<void> {
+  await prisma.user.upsert({
+    where: {
+      id: developmentEditorId,
+    },
+    update: {
+      email: 'editor.local@intgarti.test',
+      displayName: 'Editor local INTGARTI',
+      role: 'EDITOR',
+      status: 'ACTIVE',
+    },
+    create: {
+      id: developmentEditorId,
+      email: 'editor.local@intgarti.test',
+      displayName: 'Editor local INTGARTI',
+      role: 'EDITOR',
+      status: 'ACTIVE',
+    },
+  });
+
   for (const category of categories) {
     await prisma.category.upsert({
       where: {
@@ -85,6 +94,7 @@ async function main(): Promise<void> {
   });
 
   console.log('Initial INTGARTI data created.');
+  console.log(`Development editor: ${developmentEditorId}`);
 }
 
 main()

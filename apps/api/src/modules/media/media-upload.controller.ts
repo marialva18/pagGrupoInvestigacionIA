@@ -1,0 +1,51 @@
+import type { RequestHandler } from 'express';
+import { AppError } from '../../common/errors/app-error.js';
+import {
+  completeMediaUploadParamsSchema,
+  createMediaUploadRequestSchema,
+} from './media-upload.schema.js';
+import { completeMediaUpload, createMediaUploadRequest } from './media-upload.service.js';
+
+export const createMediaUploadRequestHandler: RequestHandler = (request, response, next) => {
+  const parsed = createMediaUploadRequestSchema.safeParse(request.body);
+
+  if (!parsed.success) {
+    next(
+      new AppError(
+        'Los datos de la imagen no son válidos. Solo se permiten JPEG, PNG y WebP de hasta 10 MB.',
+        400,
+        'MEDIA_UPLOAD_INVALID_INPUT',
+      ),
+    );
+
+    return;
+  }
+
+  void createMediaUploadRequest(parsed.data)
+    .then((result) => {
+      response.status(201).json({
+        data: result,
+      });
+    })
+    .catch(next);
+};
+
+export const completeMediaUploadHandler: RequestHandler = (request, response, next) => {
+  const parsed = completeMediaUploadParamsSchema.safeParse(request.params);
+
+  if (!parsed.success) {
+    next(
+      new AppError('El identificador de la imagen no es válido.', 400, 'MEDIA_ASSET_INVALID_ID'),
+    );
+
+    return;
+  }
+
+  void completeMediaUpload(parsed.data.mediaAssetId)
+    .then((result) => {
+      response.status(200).json({
+        data: result,
+      });
+    })
+    .catch(next);
+};

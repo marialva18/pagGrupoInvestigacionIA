@@ -16,6 +16,8 @@ const envSchema = z.object({
 
   LOG_LEVEL: z.string().default('info'),
 
+  ENABLE_EDITOR_ROUTES: booleanString.optional(),
+
   STORAGE_PROVIDER: z.enum(['minio', 'supabase']).default('minio'),
 
   S3_INTERNAL_ENDPOINT: z.string().url().default('http://minio:9000'),
@@ -47,7 +49,22 @@ if (!parsed.success) {
   throw new Error('Invalid environment configuration');
 }
 
-export const env = parsed.data;
+const parsedEnv = parsed.data;
+
+export function resolveEditorRoutesEnabled(
+  nodeEnv: 'development' | 'test' | 'production',
+  configuredValue: boolean | undefined,
+): boolean {
+  return configuredValue ?? nodeEnv !== 'production';
+}
+
+export const env = {
+  ...parsedEnv,
+  ENABLE_EDITOR_ROUTES: resolveEditorRoutesEnabled(
+    parsedEnv.NODE_ENV,
+    parsedEnv.ENABLE_EDITOR_ROUTES,
+  ),
+};
 
 export const allowedOrigins = env.WEB_ORIGINS.split(',')
   .map((origin) => origin.trim())

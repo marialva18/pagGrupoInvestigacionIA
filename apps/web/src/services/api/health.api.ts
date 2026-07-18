@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { apiRequest } from './http-client';
+import { apiRequest } from '../../lib/api-client';
 
 export const apiHealthSchema = z.object({
   status: z.literal('ok'),

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import compression from 'compression';
 import cors from 'cors';
 import express, { type Express } from 'express';
@@ -46,6 +47,18 @@ app.use(
 
 app.use(
   pinoHttp({
+    genReqId(request, response) {
+      const incomingRequestId = request.headers['x-request-id'];
+
+      const requestId =
+        typeof incomingRequestId === 'string' && /^[A-Za-z0-9._:-]{1,100}$/.test(incomingRequestId)
+          ? incomingRequestId
+          : randomUUID();
+
+      response.setHeader('x-request-id', requestId);
+
+      return requestId;
+    },
     autoLogging: true,
     quietReqLogger: true,
     quietResLogger: false,

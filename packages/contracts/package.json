@@ -5,7 +5,7 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./src/index.ts",
       "import": "./dist/index.js"
     }
   },
@@ -14,7 +14,7 @@
     "check": "tsc --noEmit",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
-    "test": "node -e \"console.log(\u0027Contract tests pending\u0027)\""
+    "test": "node -e \"console.log('Contract tests pending')\""
   },
   "devDependencies": {
     "@eslint/js": "latest",

@@ -10,7 +10,7 @@
     "check": "tsc --noEmit",
     "lint": "eslint src tests",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test tests/health.test.ts tests/media-upload.test.ts tests/news.test.ts"
+    "test": "node --import tsx --test tests/health.test.ts tests/security-routes.test.ts tests/http-contract.test.ts tests/media-upload.test.ts tests/news.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1088.0",

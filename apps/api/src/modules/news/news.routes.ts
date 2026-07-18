@@ -4,6 +4,7 @@ import {
   createNewsHandler,
   getNewsByIdHandler,
   listNewsHandler,
+  listNewsRevisionsHandler,
   restoreNewsHandler,
   updateNewsHandler,
 } from './news.controller.js';
@@ -11,6 +12,8 @@ import {
 export const newsRouter: Router = express.Router();
 
 newsRouter.get('/', listNewsHandler);
+newsRouter.get('/:newsId/revisions', listNewsRevisionsHandler);
+
 newsRouter.get('/:newsId', getNewsByIdHandler);
 newsRouter.post('/', createNewsHandler);
 newsRouter.post('/:newsId/restore', restoreNewsHandler);

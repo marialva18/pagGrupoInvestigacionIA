@@ -75,6 +75,8 @@ export const updateNewsSchema = z
   .object({
     lockVersion: z.number().int().min(1),
 
+    changeSummary: z.string().trim().min(10).max(500).optional(),
+
     title: z.string().trim().min(5).max(220).optional(),
 
     slug: z

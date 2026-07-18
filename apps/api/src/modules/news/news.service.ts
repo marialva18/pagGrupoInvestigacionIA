@@ -614,6 +614,18 @@ export async function getNewsById(newsId: string) {
   };
 }
 
+type NewsRevisionSnapshot = {
+  slug: string;
+  title: string;
+  summary: string;
+  body: NonNullable<UpdateNewsInput['body']>;
+  seoTitle: string | null;
+  metaDescription: string | null;
+  featured: boolean;
+  coverMediaId: string | null;
+  categoryIds: string[];
+};
+
 export async function updateNews(newsId: string, input: UpdateNewsInput) {
   const prisma = getPrismaClient();
 
@@ -675,6 +687,11 @@ export async function updateNews(newsId: string, input: UpdateNewsInput) {
         featured: true,
         lockVersion: true,
         coverMediaId: true,
+        scheduledAt: true,
+        publishedAt: true,
+        archivedAt: true,
+        createdAt: true,
+        updatedAt: true,
 
         categories: {
           select: {
@@ -693,6 +710,14 @@ export async function updateNews(newsId: string, input: UpdateNewsInput) {
         'La noticia fue modificada por otro usuario. Actualiza la página antes de volver a guardar.',
         409,
         'NEWS_VERSION_CONFLICT',
+      );
+    }
+
+    if (existing.status === 'ARCHIVED') {
+      throw new AppError(
+        'La noticia está archivada. Debes restaurarla antes de editarla.',
+        409,
+        'NEWS_ARCHIVED_READ_ONLY',
       );
     }
 
@@ -768,6 +793,100 @@ export async function updateNews(newsId: string, input: UpdateNewsInput) {
       }
     }
 
+    /*
+     * Cuando una noticia ya está publicada:
+     * 1. Conservamos automáticamente su versión anterior.
+     * 2. Aplicamos el cambio de inmediato.
+     * 3. La noticia continúa publicada.
+     *
+     * El usuario solo necesita presionar Guardar cambios.
+     */
+    let historyRevision: {
+      id: string;
+      version: number;
+      status: string;
+      snapshot: unknown;
+      changeSummary: string | null;
+      sourceLockVersion: number;
+      createdAt: Date;
+      updatedAt: Date;
+    } | null = null;
+
+    if (existing.status === 'PUBLISHED') {
+      const previousSnapshot: NewsRevisionSnapshot = {
+        slug: existing.slug,
+        title: existing.title,
+        summary: existing.summary ?? '',
+        body: (existing.body as NonNullable<UpdateNewsInput['body']> | null) ?? {
+          version: 1,
+          blocks: [],
+        },
+        seoTitle: existing.seoTitle,
+        metaDescription: existing.metaDescription,
+        featured: existing.featured,
+        coverMediaId: existing.coverMediaId,
+        categoryIds: existing.categories.map(({ categoryId }) => categoryId),
+      };
+
+      const latestRevision = await transaction.contentRevision.findFirst({
+        where: {
+          contentId: newsId,
+        },
+        orderBy: {
+          version: 'desc',
+        },
+        select: {
+          version: true,
+        },
+      });
+
+      /*
+       * Las revisiones DRAFT creadas durante el prototipo anterior
+       * dejan de estar activas, pero no se eliminan.
+       */
+      await transaction.contentRevision.updateMany({
+        where: {
+          contentId: newsId,
+          status: {
+            in: ['DRAFT', 'IN_REVIEW', 'CHANGES_REQUESTED', 'APPROVED'],
+          },
+        },
+        data: {
+          status: 'ARCHIVED',
+        },
+      });
+
+      historyRevision = await transaction.contentRevision.create({
+        data: {
+          contentId: newsId,
+          version: (latestRevision?.version ?? 0) + 1,
+          status: 'SUPERSEDED',
+          sourceLockVersion: existing.lockVersion,
+          snapshot: previousSnapshot,
+          changeSummary:
+            input.changeSummary?.trim() ??
+            'Versión anterior guardada automáticamente antes de editar la publicación.',
+          createdById: editor.id,
+          publishedAt: existing.publishedAt,
+        },
+        select: {
+          id: true,
+          version: true,
+          status: true,
+          snapshot: true,
+          changeSummary: true,
+          sourceLockVersion: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    }
+
+    /*
+     * Tanto el borrador como la publicación se actualizan
+     * directamente. En publicaciones, la versión anterior ya quedó
+     * protegida dentro del historial.
+     */
     const transition = await transaction.contentItem.updateMany({
       where: {
         id: newsId,
@@ -954,9 +1073,10 @@ export async function updateNews(newsId: string, input: UpdateNewsInput) {
     await transaction.auditLog.create({
       data: {
         actorId: editor.id,
-        action: 'NEWS_UPDATED',
+        action: existing.status === 'PUBLISHED' ? 'NEWS_PUBLISHED_UPDATED' : 'NEWS_UPDATED',
         entityType: 'ContentItem',
         entityId: newsId,
+        reason: input.changeSummary?.trim() ?? null,
 
         before: {
           slug: existing.slug,
@@ -966,7 +1086,9 @@ export async function updateNews(newsId: string, input: UpdateNewsInput) {
           seoTitle: existing.seoTitle,
           metaDescription: existing.metaDescription,
           coverMediaId: existing.coverMediaId,
+
           categoryIds: existing.categories.map(({ categoryId }) => categoryId),
+
           lockVersion: existing.lockVersion,
         },
 
@@ -977,14 +1099,23 @@ export async function updateNews(newsId: string, input: UpdateNewsInput) {
           body: updated.body,
           seoTitle: updated.seoTitle,
           metaDescription: updated.metaDescription,
+
           coverMediaId: updated.coverMedia?.id ?? null,
+
           categoryIds: updated.categories.map(({ category }) => category.id),
+
           lockVersion: updated.lockVersion,
         },
       },
     });
 
     return {
+      updateMode:
+        existing.status === 'PUBLISHED' ? ('PUBLISHED_DIRECT' as const) : ('DIRECT' as const),
+
+      publishedContentUpdated: existing.status === 'PUBLISHED',
+
+      historyRevision,
       ...updated,
 
       categories: updated.categories.map(({ category }) => category),
@@ -1340,4 +1471,121 @@ export async function restoreNews(newsId: string, input: RestoreNewsInput) {
       categories: restored.categories.map(({ category }) => category),
     };
   });
+}
+
+export async function listNewsRevisions(newsId: string) {
+  const prisma = getPrismaClient();
+
+  const editor = await prisma.user.findUnique({
+    where: {
+      id: env.DEV_EDITOR_USER_ID,
+    },
+    select: {
+      id: true,
+      role: true,
+      status: true,
+    },
+  });
+
+  if (!editor || editor.status !== 'ACTIVE' || !['ADMIN', 'EDITOR'].includes(editor.role)) {
+    throw new AppError(
+      'El editor local no existe o no está activo.',
+      503,
+      'DEVELOPMENT_EDITOR_NOT_AVAILABLE',
+    );
+  }
+
+  const accessCondition =
+    editor.role === 'ADMIN'
+      ? {}
+      : {
+          OR: [
+            {
+              createdById: editor.id,
+            },
+            {
+              assignedEditorId: editor.id,
+            },
+          ],
+        };
+
+  const content = await prisma.contentItem.findFirst({
+    where: {
+      AND: [
+        {
+          id: newsId,
+        },
+        {
+          type: 'NEWS',
+        },
+        accessCondition,
+      ],
+    },
+    select: {
+      id: true,
+      status: true,
+      lockVersion: true,
+      title: true,
+    },
+  });
+
+  if (!content) {
+    throw new AppError('No se encontró la noticia solicitada.', 404, 'NEWS_NOT_FOUND');
+  }
+
+  const revisions = await prisma.contentRevision.findMany({
+    where: {
+      contentId: newsId,
+    },
+    orderBy: {
+      version: 'desc',
+    },
+    select: {
+      id: true,
+      version: true,
+      status: true,
+      sourceLockVersion: true,
+      snapshot: true,
+      changeSummary: true,
+      publishedAt: true,
+      createdAt: true,
+      updatedAt: true,
+
+      createdBy: {
+        select: {
+          id: true,
+          displayName: true,
+        },
+      },
+
+      reviewedBy: {
+        select: {
+          id: true,
+          displayName: true,
+        },
+      },
+
+      approvedBy: {
+        select: {
+          id: true,
+          displayName: true,
+        },
+      },
+
+      publishedBy: {
+        select: {
+          id: true,
+          displayName: true,
+        },
+      },
+    },
+  });
+
+  return {
+    contentId: content.id,
+    title: content.title,
+    publicStatus: content.status,
+    publicLockVersion: content.lockVersion,
+    items: revisions,
+  };
 }

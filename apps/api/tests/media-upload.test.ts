@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
 import test from 'node:test';
-import { app } from '../src/app.ts';
+import { createApp } from '../src/app.ts';
+import { authenticatedFetch, testAuthenticateAccessToken } from './helpers/test-auth.ts';
+
+const app = createApp({
+  authenticateAccessToken: testAuthenticateAccessToken,
+});
 
 async function withApiServer(assertion: (baseUrl: string) => Promise<void>): Promise<void> {
   const server = app.listen(0, '127.0.0.1');
@@ -29,7 +34,7 @@ async function withApiServer(assertion: (baseUrl: string) => Promise<void>): Pro
 
 test('rejects unsupported media uploads', async () => {
   await withApiServer(async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/v1/editor/media/upload-requests`, {
+    const response = await authenticatedFetch(`${baseUrl}/api/v1/editor/media/upload-requests`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -55,9 +60,12 @@ test('rejects unsupported media uploads', async () => {
 
 test('rejects an invalid media asset identifier', async () => {
   await withApiServer(async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/v1/editor/media/not-a-uuid/complete`, {
-      method: 'POST',
-    });
+    const response = await authenticatedFetch(
+      `${baseUrl}/api/v1/editor/media/not-a-uuid/complete`,
+      {
+        method: 'POST',
+      },
+    );
 
     assert.equal(response.status, 400);
 

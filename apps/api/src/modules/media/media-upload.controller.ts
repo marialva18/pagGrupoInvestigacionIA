@@ -1,5 +1,6 @@
 import type { RequestHandler } from 'express';
 import { AppError } from '../../common/errors/app-error.js';
+import { getAuthenticatedUser } from '../auth/auth.middleware.js';
 import {
   completeMediaUploadParamsSchema,
   createMediaUploadRequestSchema,
@@ -21,7 +22,7 @@ export const createMediaUploadRequestHandler: RequestHandler = (request, respons
     return;
   }
 
-  void createMediaUploadRequest(parsed.data)
+  void createMediaUploadRequest(getAuthenticatedUser(request), parsed.data)
     .then((result) => {
       response.status(201).json({
         data: result,
@@ -41,7 +42,7 @@ export const completeMediaUploadHandler: RequestHandler = (request, response, ne
     return;
   }
 
-  void completeMediaUpload(parsed.data.mediaAssetId)
+  void completeMediaUpload(getAuthenticatedUser(request), parsed.data.mediaAssetId)
     .then((result) => {
       response.status(200).json({
         data: result,

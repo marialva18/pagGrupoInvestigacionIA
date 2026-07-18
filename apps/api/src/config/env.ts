@@ -18,6 +18,10 @@ const envSchema = z.object({
 
   ENABLE_EDITOR_ROUTES: booleanString.optional(),
 
+  SUPABASE_URL: z.string().url().optional(),
+
+  SUPABASE_ANON_KEY: z.string().min(1).optional(),
+
   STORAGE_PROVIDER: z.enum(['minio', 'supabase']).default('minio'),
 
   S3_INTERNAL_ENDPOINT: z.string().url().default('http://minio:9000'),

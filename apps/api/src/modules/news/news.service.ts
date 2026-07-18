@@ -1,13 +1,15 @@
+import type { AuthenticatedUser } from '@intgarti/contracts';
 import type { RestoreNewsInput } from './news.schema.js';
 import { getPrismaClient } from '@intgarti/database';
 import { AppError } from '../../common/errors/app-error.js';
-import { env } from '../../config/env.js';
 import type {
   ArchiveNewsInput,
   CreateNewsInput,
   ListNewsInput,
   UpdateNewsInput,
 } from './news.schema.js';
+
+type NewsActor = Pick<AuthenticatedUser, 'id' | 'role'>;
 
 function normalizeSlug(value: string): string {
   return value
@@ -31,29 +33,11 @@ function createNumberedSlug(baseSlug: string, number: number): string {
   return `${baseSlug.slice(0, 180 - suffix.length)}${suffix}`;
 }
 
-export async function createNews(input: CreateNewsInput) {
+export async function createNews(actor: NewsActor, input: CreateNewsInput) {
   const prisma = getPrismaClient();
 
   return prisma.$transaction(async (transaction) => {
-    const editor = await transaction.user.findUnique({
-      where: {
-        id: env.DEV_EDITOR_USER_ID,
-      },
-      select: {
-        id: true,
-        displayName: true,
-        role: true,
-        status: true,
-      },
-    });
-
-    if (!editor || editor.status !== 'ACTIVE' || !['ADMIN', 'EDITOR'].includes(editor.role)) {
-      throw new AppError(
-        'El editor local no existe o no está activo.',
-        503,
-        'DEVELOPMENT_EDITOR_NOT_AVAILABLE',
-      );
-    }
+    const editor = actor;
 
     const categories = await transaction.category.findMany({
       where: {
@@ -263,27 +247,10 @@ export async function createNews(input: CreateNewsInput) {
   });
 }
 
-export async function listNews(input: ListNewsInput) {
+export async function listNews(actor: NewsActor, input: ListNewsInput) {
   const prisma = getPrismaClient();
 
-  const editor = await prisma.user.findUnique({
-    where: {
-      id: env.DEV_EDITOR_USER_ID,
-    },
-    select: {
-      id: true,
-      role: true,
-      status: true,
-    },
-  });
-
-  if (!editor || editor.status !== 'ACTIVE' || !['ADMIN', 'EDITOR'].includes(editor.role)) {
-    throw new AppError(
-      'El editor local no existe o no está activo.',
-      503,
-      'DEVELOPMENT_EDITOR_NOT_AVAILABLE',
-    );
-  }
+  const editor = actor;
 
   const accessCondition =
     editor.role === 'ADMIN'
@@ -464,27 +431,10 @@ export async function listNews(input: ListNewsInput) {
   };
 }
 
-export async function getNewsById(newsId: string) {
+export async function getNewsById(actor: NewsActor, newsId: string) {
   const prisma = getPrismaClient();
 
-  const editor = await prisma.user.findUnique({
-    where: {
-      id: env.DEV_EDITOR_USER_ID,
-    },
-    select: {
-      id: true,
-      role: true,
-      status: true,
-    },
-  });
-
-  if (!editor || editor.status !== 'ACTIVE' || !['ADMIN', 'EDITOR'].includes(editor.role)) {
-    throw new AppError(
-      'El editor local no existe o no está activo.',
-      503,
-      'DEVELOPMENT_EDITOR_NOT_AVAILABLE',
-    );
-  }
+  const editor = actor;
 
   const accessCondition =
     editor.role === 'ADMIN'
@@ -626,28 +576,11 @@ type NewsRevisionSnapshot = {
   categoryIds: string[];
 };
 
-export async function updateNews(newsId: string, input: UpdateNewsInput) {
+export async function updateNews(actor: NewsActor, newsId: string, input: UpdateNewsInput) {
   const prisma = getPrismaClient();
 
   return prisma.$transaction(async (transaction) => {
-    const editor = await transaction.user.findUnique({
-      where: {
-        id: env.DEV_EDITOR_USER_ID,
-      },
-      select: {
-        id: true,
-        role: true,
-        status: true,
-      },
-    });
-
-    if (!editor || editor.status !== 'ACTIVE' || !['ADMIN', 'EDITOR'].includes(editor.role)) {
-      throw new AppError(
-        'El editor local no existe o no está activo.',
-        503,
-        'DEVELOPMENT_EDITOR_NOT_AVAILABLE',
-      );
-    }
+    const editor = actor;
 
     const accessCondition =
       editor.role === 'ADMIN'
@@ -1122,28 +1055,11 @@ export async function updateNews(newsId: string, input: UpdateNewsInput) {
     };
   });
 }
-export async function archiveNews(newsId: string, input: ArchiveNewsInput) {
+export async function archiveNews(actor: NewsActor, newsId: string, input: ArchiveNewsInput) {
   const prisma = getPrismaClient();
 
   return prisma.$transaction(async (transaction) => {
-    const editor = await transaction.user.findUnique({
-      where: {
-        id: env.DEV_EDITOR_USER_ID,
-      },
-      select: {
-        id: true,
-        role: true,
-        status: true,
-      },
-    });
-
-    if (!editor || editor.status !== 'ACTIVE' || !['ADMIN', 'EDITOR'].includes(editor.role)) {
-      throw new AppError(
-        'El editor local no existe o no está activo.',
-        503,
-        'DEVELOPMENT_EDITOR_NOT_AVAILABLE',
-      );
-    }
+    const editor = actor;
 
     const accessCondition =
       editor.role === 'ADMIN'
@@ -1295,28 +1211,11 @@ export async function archiveNews(newsId: string, input: ArchiveNewsInput) {
   });
 }
 
-export async function restoreNews(newsId: string, input: RestoreNewsInput) {
+export async function restoreNews(actor: NewsActor, newsId: string, input: RestoreNewsInput) {
   const prisma = getPrismaClient();
 
   return prisma.$transaction(async (transaction) => {
-    const editor = await transaction.user.findUnique({
-      where: {
-        id: env.DEV_EDITOR_USER_ID,
-      },
-      select: {
-        id: true,
-        role: true,
-        status: true,
-      },
-    });
-
-    if (!editor || editor.status !== 'ACTIVE' || !['ADMIN', 'EDITOR'].includes(editor.role)) {
-      throw new AppError(
-        'El editor local no existe o no está activo.',
-        503,
-        'DEVELOPMENT_EDITOR_NOT_AVAILABLE',
-      );
-    }
+    const editor = actor;
 
     const accessCondition =
       editor.role === 'ADMIN'
@@ -1473,27 +1372,10 @@ export async function restoreNews(newsId: string, input: RestoreNewsInput) {
   });
 }
 
-export async function listNewsRevisions(newsId: string) {
+export async function listNewsRevisions(actor: NewsActor, newsId: string) {
   const prisma = getPrismaClient();
 
-  const editor = await prisma.user.findUnique({
-    where: {
-      id: env.DEV_EDITOR_USER_ID,
-    },
-    select: {
-      id: true,
-      role: true,
-      status: true,
-    },
-  });
-
-  if (!editor || editor.status !== 'ACTIVE' || !['ADMIN', 'EDITOR'].includes(editor.role)) {
-    throw new AppError(
-      'El editor local no existe o no está activo.',
-      503,
-      'DEVELOPMENT_EDITOR_NOT_AVAILABLE',
-    );
-  }
+  const editor = actor;
 
   const accessCondition =
     editor.role === 'ADMIN'

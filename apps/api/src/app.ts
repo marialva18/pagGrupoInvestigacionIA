@@ -8,73 +8,80 @@ import { pinoHttp } from 'pino-http';
 import { errorMiddleware } from './common/middlewares/error.middleware.js';
 import { notFoundMiddleware } from './common/middlewares/not-found.middleware.js';
 import { allowedOrigins } from './config/env.js';
-import { apiV1Router } from './routes/index.js';
+import { createApiV1Router, type ApiV1RouterOptions } from './routes/index.js';
 
-export const app: Express = express();
+export function createApp(options: ApiV1RouterOptions = {}): Express {
+  const application = express();
 
-app.disable('x-powered-by');
+  application.disable('x-powered-by');
 
-app.use(helmet());
+  application.use(helmet());
 
-app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-        return;
-      }
+  application.use(
+    cors({
+      origin(origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+          callback(null, true);
+          return;
+        }
 
-      callback(new Error('CORS origin not allowed'));
-    },
-    credentials: true,
-  }),
-);
+        callback(new Error('CORS origin not allowed'));
+      },
+      credentials: true,
+    }),
+  );
 
-app.use(compression());
+  application.use(compression());
 
-app.use(
-  express.json({
-    limit: '1mb',
-  }),
-);
+  application.use(
+    express.json({
+      limit: '1mb',
+    }),
+  );
 
-app.use(
-  express.urlencoded({
-    extended: false,
-    limit: '1mb',
-  }),
-);
+  application.use(
+    express.urlencoded({
+      extended: false,
+      limit: '1mb',
+    }),
+  );
 
-app.use(
-  pinoHttp({
-    genReqId(request, response) {
-      const incomingRequestId = request.headers['x-request-id'];
+  application.use(
+    pinoHttp({
+      genReqId(request, response) {
+        const incomingRequestId = request.headers['x-request-id'];
 
-      const requestId =
-        typeof incomingRequestId === 'string' && /^[A-Za-z0-9._:-]{1,100}$/.test(incomingRequestId)
-          ? incomingRequestId
-          : randomUUID();
+        const requestId =
+          typeof incomingRequestId === 'string' &&
+          /^[A-Za-z0-9._:-]{1,100}$/.test(incomingRequestId)
+            ? incomingRequestId
+            : randomUUID();
 
-      response.setHeader('x-request-id', requestId);
+        response.setHeader('x-request-id', requestId);
 
-      return requestId;
-    },
-    autoLogging: true,
-    quietReqLogger: true,
-    quietResLogger: false,
-  }),
-);
+        return requestId;
+      },
+      autoLogging: true,
+      quietReqLogger: true,
+      quietResLogger: false,
+    }),
+  );
 
-app.use(
-  '/api/v1',
-  rateLimit({
-    windowMs: 60_000,
-    limit: 120,
-    standardHeaders: 'draft-8',
-    legacyHeaders: false,
-  }),
-  apiV1Router,
-);
+  application.use(
+    '/api/v1',
+    rateLimit({
+      windowMs: 60_000,
+      limit: 120,
+      standardHeaders: 'draft-8',
+      legacyHeaders: false,
+    }),
+    createApiV1Router(options),
+  );
 
-app.use(notFoundMiddleware);
-app.use(errorMiddleware);
+  application.use(notFoundMiddleware);
+  application.use(errorMiddleware);
+
+  return application;
+}
+
+export const app: Express = createApp();

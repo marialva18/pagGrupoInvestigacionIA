@@ -10,13 +10,16 @@
     "check": "tsc --noEmit",
     "lint": "eslint src tests",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test tests/health.test.ts tests/security-routes.test.ts tests/http-contract.test.ts tests/media-upload.test.ts tests/news.test.ts"
+    "test": "node --import tsx --test tests/health.test.ts tests/security-routes.test.ts tests/http-contract.test.ts tests/media-upload.test.ts tests/news.test.ts tests/auth.test.ts",
+    "auth:provision-user": "tsx src/scripts/provision-cms-user.ts",
+    "auth:smoke": "tsx src/scripts/auth-smoke.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1088.0",
     "@aws-sdk/s3-request-presigner": "^3.1088.0",
     "@intgarti/contracts": "workspace:*",
     "@intgarti/database": "workspace:*",
+    "@supabase/supabase-js": "^2.110.7",
     "compression": "latest",
     "cors": "latest",
     "dotenv": "latest",

@@ -3,6 +3,7 @@ import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
 import test from 'node:test';
 import express, { type Express } from 'express';
+import { errorMiddleware } from '../src/common/middlewares/error.middleware.ts';
 import { resolveEditorRoutesEnabled } from '../src/config/env.ts';
 import { createApiV1Router } from '../src/routes/index.ts';
 
@@ -61,5 +62,32 @@ test('does not expose editor routes when they are disabled', async () => {
 
     assert.equal(healthResponse.status, 200);
     assert.equal(editorResponse.status, 404);
+  });
+});
+
+test('requires authentication when editor routes are enabled', async () => {
+  const application = express();
+
+  application.use(
+    '/api/v1',
+    createApiV1Router({
+      enableEditorRoutes: true,
+    }),
+  );
+
+  application.use(errorMiddleware);
+
+  await withServer(application, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/editor/news`);
+
+    assert.equal(response.status, 401);
+
+    const body = (await response.json()) as {
+      error: {
+        code: string;
+      };
+    };
+
+    assert.equal(body.error.code, 'AUTH_REQUIRED');
   });
 });

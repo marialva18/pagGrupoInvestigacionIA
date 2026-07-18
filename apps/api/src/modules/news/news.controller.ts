@@ -1,5 +1,6 @@
 import type { RequestHandler } from 'express';
 import { AppError } from '../../common/errors/app-error.js';
+import { getAuthenticatedUser } from '../auth/auth.middleware.js';
 import {
   archiveNewsSchema,
   createNewsSchema,
@@ -27,7 +28,7 @@ export const createNewsHandler: RequestHandler = (request, response, next) => {
     return;
   }
 
-  void createNews(parsed.data)
+  void createNews(getAuthenticatedUser(request), parsed.data)
     .then((news) => {
       response.status(201).json({
         data: news,
@@ -51,7 +52,7 @@ export const listNewsHandler: RequestHandler = (request, response, next) => {
     return;
   }
 
-  void listNews(parsed.data)
+  void listNews(getAuthenticatedUser(request), parsed.data)
     .then((result) => {
       response.status(200).json({
         data: result,
@@ -69,7 +70,7 @@ export const getNewsByIdHandler: RequestHandler = (request, response, next) => {
     return;
   }
 
-  void getNewsById(parsed.data.newsId)
+  void getNewsById(getAuthenticatedUser(request), parsed.data.newsId)
     .then((news) => {
       response.status(200).json({
         data: news,
@@ -101,7 +102,7 @@ export const updateNewsHandler: RequestHandler = (request, response, next) => {
     return;
   }
 
-  void updateNews(parsedParams.data.newsId, parsedBody.data)
+  void updateNews(getAuthenticatedUser(request), parsedParams.data.newsId, parsedBody.data)
     .then((news) => {
       response.status(200).json({
         data: news,
@@ -133,7 +134,7 @@ export const archiveNewsHandler: RequestHandler = (request, response, next) => {
     return;
   }
 
-  void archiveNews(parsedParams.data.newsId, parsedBody.data)
+  void archiveNews(getAuthenticatedUser(request), parsedParams.data.newsId, parsedBody.data)
     .then((news) => {
       response.status(200).json({
         data: news,
@@ -165,7 +166,7 @@ export const restoreNewsHandler: RequestHandler = (request, response, next) => {
     return;
   }
 
-  void restoreNews(parsedParams.data.newsId, parsedBody.data)
+  void restoreNews(getAuthenticatedUser(request), parsedParams.data.newsId, parsedBody.data)
     .then((news) => {
       response.status(200).json({
         data: news,
@@ -183,7 +184,7 @@ export const listNewsRevisionsHandler: RequestHandler = (request, response, next
     return;
   }
 
-  void listNewsRevisions(parsed.data.newsId)
+  void listNewsRevisions(getAuthenticatedUser(request), parsed.data.newsId)
     .then((result) => {
       response.status(200).json({
         data: result,

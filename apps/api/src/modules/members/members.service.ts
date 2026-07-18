@@ -121,9 +121,20 @@ async function validateMemberPhoto(photoMediaId: string | null | undefined): Pro
     );
   }
 
-  if (media.width === null || media.height === null || media.width < 600 || media.height < 600) {
+  if (media.width === null || media.height === null) {
     throw new AppError(
-      'La fotografía debe tener como mínimo 600 x 600 píxeles.',
+      'No se pudieron determinar las dimensiones de la fotografía.',
+      422,
+      'MEMBER_PHOTO_DIMENSIONS_UNKNOWN',
+    );
+  }
+
+  const shortestSide = Math.min(media.width, media.height);
+  const longestSide = Math.max(media.width, media.height);
+
+  if (shortestSide < 240 || longestSide < 320) {
+    throw new AppError(
+      'La fotografía tiene una resolución demasiado baja. El lado menor debe tener al menos 240 píxeles y el lado mayor 320 píxeles.',
       422,
       'MEMBER_PHOTO_TOO_SMALL',
     );

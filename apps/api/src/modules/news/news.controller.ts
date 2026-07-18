@@ -13,6 +13,7 @@ import {
   createNews,
   getNewsById,
   listNews,
+  listNewsRevisions,
   restoreNews,
   updateNews,
 } from './news.service.js';
@@ -168,6 +169,24 @@ export const restoreNewsHandler: RequestHandler = (request, response, next) => {
     .then((news) => {
       response.status(200).json({
         data: news,
+      });
+    })
+    .catch(next);
+};
+
+export const listNewsRevisionsHandler: RequestHandler = (request, response, next) => {
+  const parsed = newsIdParamsSchema.safeParse(request.params);
+
+  if (!parsed.success) {
+    next(new AppError('El identificador de la noticia no es válido.', 400, 'NEWS_INVALID_ID'));
+
+    return;
+  }
+
+  void listNewsRevisions(parsed.data.newsId)
+    .then((result) => {
+      response.status(200).json({
+        data: result,
       });
     })
     .catch(next);

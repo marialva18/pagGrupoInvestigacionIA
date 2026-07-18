@@ -38,6 +38,16 @@ enum ContentStatus {
   ARCHIVED
 }
 
+enum RevisionStatus {
+  DRAFT
+  IN_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  PUBLISHED
+  SUPERSEDED
+  ARCHIVED
+}
+
 enum StorageProvider {
   MINIO
   SUPABASE
@@ -115,6 +125,11 @@ model User {
   mediaAssets      MediaAsset[]
   auditLogs        AuditLog[]
 
+  createdRevisions   ContentRevision[] @relation("RevisionCreatedBy")
+  reviewedRevisions  ContentRevision[] @relation("RevisionReviewedBy")
+  approvedRevisions  ContentRevision[] @relation("RevisionApprovedBy")
+  publishedRevisions ContentRevision[] @relation("RevisionPublishedBy")
+
   @@index([role, status])
   @@index([createdAt])
 }
@@ -155,11 +170,42 @@ model ContentItem {
 
   categories ContentCategory[]
   media      ContentMedia[]
+  revisions  ContentRevision[]
 
   @@index([type, status])
   @@index([status, publishedAt])
   @@index([assignedEditorId, status])
   @@index([featured, publishedAt])
+}
+
+model ContentRevision {
+  id                String         @id @default(uuid()) @db.Uuid
+  contentId         String         @db.Uuid
+  version           Int
+  status            RevisionStatus @default(DRAFT)
+  sourceLockVersion Int
+  snapshot          Json
+  changeSummary     String?        @db.VarChar(500)
+
+  createdById   String  @db.Uuid
+  reviewedById  String? @db.Uuid
+  approvedById  String? @db.Uuid
+  publishedById String? @db.Uuid
+
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  content     ContentItem @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  createdBy   User        @relation("RevisionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  reviewedBy  User?       @relation("RevisionReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  approvedBy  User?       @relation("RevisionApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  publishedBy User?       @relation("RevisionPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+
+  @@unique([contentId, version])
+  @@index([contentId, status])
+  @@index([createdById, createdAt])
+  @@index([status, updatedAt])
 }
 
 model Category {

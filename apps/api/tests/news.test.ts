@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
 import test from 'node:test';
-import { app } from '../src/app.ts';
+import { createApp } from '../src/app.ts';
+import { authenticatedFetch, testAuthenticateAccessToken } from './helpers/test-auth.ts';
+
+const app = createApp({
+  authenticateAccessToken: testAuthenticateAccessToken,
+});
 
 async function withApiServer(assertion: (baseUrl: string) => Promise<void>): Promise<void> {
   const server = app.listen(0, '127.0.0.1');
@@ -29,7 +34,7 @@ async function withApiServer(assertion: (baseUrl: string) => Promise<void>): Pro
 
 test('rejects an invalid news draft', async () => {
   await withApiServer(async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/v1/editor/news`, {
+    const response = await authenticatedFetch(`${baseUrl}/api/v1/editor/news`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -54,7 +59,7 @@ test('rejects an invalid news draft', async () => {
 
 test('rejects invalid news list pagination', async () => {
   await withApiServer(async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/v1/editor/news?page=0&pageSize=101`);
+    const response = await authenticatedFetch(`${baseUrl}/api/v1/editor/news?page=0&pageSize=101`);
 
     assert.equal(response.status, 400);
 
@@ -70,7 +75,7 @@ test('rejects invalid news list pagination', async () => {
 
 test('rejects an invalid news identifier', async () => {
   await withApiServer(async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/v1/editor/news/not-a-uuid`);
+    const response = await authenticatedFetch(`${baseUrl}/api/v1/editor/news/not-a-uuid`);
 
     assert.equal(response.status, 400);
 
@@ -86,7 +91,7 @@ test('rejects an invalid news identifier', async () => {
 
 test('rejects an empty news update', async () => {
   await withApiServer(async (baseUrl) => {
-    const response = await fetch(
+    const response = await authenticatedFetch(
       `${baseUrl}/api/v1/editor/news/00000000-0000-4000-8000-000000000001`,
       {
         method: 'PATCH',
@@ -113,7 +118,7 @@ test('rejects an empty news update', async () => {
 
 test('rejects an invalid identifier when updating news', async () => {
   await withApiServer(async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/v1/editor/news/not-a-uuid`, {
+    const response = await authenticatedFetch(`${baseUrl}/api/v1/editor/news/not-a-uuid`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -138,7 +143,7 @@ test('rejects an invalid identifier when updating news', async () => {
 
 test('rejects an archive request without lock version', async () => {
   await withApiServer(async (baseUrl) => {
-    const response = await fetch(
+    const response = await authenticatedFetch(
       `${baseUrl}/api/v1/editor/news/00000000-0000-4000-8000-000000000001`,
       {
         method: 'DELETE',
@@ -165,7 +170,7 @@ test('rejects an archive request without lock version', async () => {
 
 test('rejects an invalid identifier when archiving news', async () => {
   await withApiServer(async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/v1/editor/news/not-a-uuid`, {
+    const response = await authenticatedFetch(`${baseUrl}/api/v1/editor/news/not-a-uuid`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -190,7 +195,7 @@ test('rejects an invalid identifier when archiving news', async () => {
 
 test('rejects a restore request without lock version', async () => {
   await withApiServer(async (baseUrl) => {
-    const response = await fetch(
+    const response = await authenticatedFetch(
       `${baseUrl}/api/v1/editor/news/00000000-0000-4000-8000-000000000001/restore`,
       {
         method: 'POST',
@@ -217,7 +222,7 @@ test('rejects a restore request without lock version', async () => {
 
 test('rejects an invalid identifier when restoring news', async () => {
   await withApiServer(async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/v1/editor/news/not-a-uuid/restore`, {
+    const response = await authenticatedFetch(`${baseUrl}/api/v1/editor/news/not-a-uuid/restore`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -242,7 +247,7 @@ test('rejects an invalid identifier when restoring news', async () => {
 
 test('rejects an invalid identifier when listing revisions', async () => {
   await withApiServer(async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/v1/editor/news/not-a-uuid/revisions`);
+    const response = await authenticatedFetch(`${baseUrl}/api/v1/editor/news/not-a-uuid/revisions`);
 
     assert.equal(response.status, 400);
 

@@ -1,4 +1,5 @@
-import type { RequestHandler } from 'express';
+import type { AuthenticatedUser, UserRole } from '@intgarti/contracts';
+import type { Request, RequestHandler } from 'express';
 import { AppError } from '../../common/errors/app-error.js';
 import { authenticateAccessToken } from './auth.service.js';
 import type { AuthenticateAccessToken } from './auth.types.js';
@@ -11,6 +12,14 @@ export function extractBearerToken(authorizationHeader: string | undefined): str
   const match = /^Bearer\s+([^\s]+)$/i.exec(authorizationHeader.trim());
 
   return match?.[1] ?? null;
+}
+
+export function getAuthenticatedUser(request: Request): AuthenticatedUser {
+  if (!request.user) {
+    throw new AppError('Se requiere autenticación.', 401, 'AUTH_REQUIRED');
+  }
+
+  return request.user;
 }
 
 export function createRequireAuthenticatedUser(
@@ -34,15 +43,18 @@ export function createRequireAuthenticatedUser(
   };
 }
 
-function requireRole(allowedRoles: Array<'ADMIN' | 'EDITOR'>): RequestHandler {
+function requireRole(allowedRoles: UserRole[]): RequestHandler {
   return (request, _response, next) => {
-    if (!request.user) {
-      next(new AppError('Se requiere autenticación.', 401, 'AUTH_REQUIRED'));
+    let user: AuthenticatedUser;
 
+    try {
+      user = getAuthenticatedUser(request);
+    } catch (error: unknown) {
+      next(error);
       return;
     }
 
-    if (!allowedRoles.includes(request.user.role)) {
+    if (!allowedRoles.includes(user.role)) {
       next(new AppError('No tiene permisos para realizar esta operación.', 403, 'AUTH_FORBIDDEN'));
 
       return;

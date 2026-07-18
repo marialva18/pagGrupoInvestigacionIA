@@ -1,10 +1,13 @@
 import { randomUUID } from 'node:crypto';
+import type { AuthenticatedUser } from '@intgarti/contracts';
 import { HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { getPrismaClient } from '@intgarti/database';
 import { AppError } from '../../common/errors/app-error.js';
 import { env } from '../../config/env.js';
 import type { CreateMediaUploadRequestInput } from './media-upload.schema.js';
+
+type MediaActor = Pick<AuthenticatedUser, 'id'>;
 
 const extensionByMimeType = {
   'image/jpeg': 'jpg',
@@ -58,26 +61,11 @@ function normalizeMimeType(mimeType: string | undefined): string | undefined {
   return mimeType?.split(';', 1)[0]?.trim().toLowerCase();
 }
 
-export async function createMediaUploadRequest(input: CreateMediaUploadRequestInput) {
+export async function createMediaUploadRequest(
+  actor: MediaActor,
+  input: CreateMediaUploadRequestInput,
+) {
   const prisma = getPrismaClient();
-
-  const editor = await prisma.user.findUnique({
-    where: {
-      id: env.DEV_EDITOR_USER_ID,
-    },
-    select: {
-      id: true,
-      status: true,
-    },
-  });
-
-  if (!editor || editor.status !== 'ACTIVE') {
-    throw new AppError(
-      'El editor local no existe o no está activo. Ejecuta el seed.',
-      503,
-      'DEVELOPMENT_EDITOR_NOT_AVAILABLE',
-    );
-  }
 
   const now = new Date();
   const mediaAssetId = randomUUID();
@@ -109,7 +97,7 @@ export async function createMediaUploadRequest(input: CreateMediaUploadRequestIn
       sizeBytes: BigInt(input.sizeBytes),
       altText: input.altText?.trim() || null,
       status: 'UPLOADING',
-      createdById: editor.id,
+      createdById: actor.id,
     },
   });
 
@@ -128,13 +116,13 @@ export async function createMediaUploadRequest(input: CreateMediaUploadRequestIn
   };
 }
 
-export async function completeMediaUpload(mediaAssetId: string) {
+export async function completeMediaUpload(actor: MediaActor, mediaAssetId: string) {
   const prisma = getPrismaClient();
 
   const mediaAsset = await prisma.mediaAsset.findFirst({
     where: {
       id: mediaAssetId,
-      createdById: env.DEV_EDITOR_USER_ID,
+      createdById: actor.id,
     },
     select: {
       id: true,

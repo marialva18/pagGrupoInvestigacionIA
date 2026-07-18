@@ -6,6 +6,8 @@ const booleanString = z.enum(['true', 'false']).transform((value) => value === '
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 
+  PORT: z.coerce.number().int().positive().optional(),
+
   API_PORT: z.coerce.number().int().positive().default(3001),
 
   WEB_ORIGINS: z.string().default('http://localhost:4321'),

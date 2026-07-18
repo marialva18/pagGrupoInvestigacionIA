@@ -5,8 +5,11 @@ if (env.TRUST_PROXY) {
   app.set('trust proxy', 1);
 }
 
-const server = app.listen(env.API_PORT, () => {
-  console.log(`INTGARTI API: http://localhost:${env.API_PORT}/api/v1/health`);
+const port = env.PORT ?? env.API_PORT;
+const host = '0.0.0.0';
+
+const server = app.listen(port, host, () => {
+  console.log(`INTGARTI API listening on http://${host}:${port}/api/v1/health`);
 });
 
 function shutdown(signal: string): void {

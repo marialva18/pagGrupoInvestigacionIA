@@ -20,23 +20,19 @@ function requireEnvironmentValue(name: string): string {
   return value;
 }
 
-async function readResponse(response: Response): Promise<unknown> {
+async function readBody(response: Response): Promise<unknown> {
   const contentType = response.headers.get('content-type');
 
-  if (contentType?.includes('application/json')) {
-    return response.json();
-  }
-
-  return response.text();
+  return contentType?.includes('application/json') ? response.json() : response.text();
 }
 
 async function main(): Promise<void> {
   const supabaseUrl = requireEnvironmentValue('SUPABASE_URL');
 
-  const supabasePublishableKey =
+  const publishableKey =
     process.env.SUPABASE_ANON_KEY?.trim() || process.env.PUBLIC_SUPABASE_ANON_KEY?.trim();
 
-  if (!supabasePublishableKey) {
+  if (!publishableKey) {
     throw new Error('SUPABASE_ANON_KEY no está configurada.');
   }
 
@@ -49,7 +45,7 @@ async function main(): Promise<void> {
     '',
   );
 
-  const supabase = createClient(supabaseUrl, supabasePublishableKey, {
+  const supabase = createClient(supabaseUrl, publishableKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
@@ -66,15 +62,13 @@ async function main(): Promise<void> {
     throw new Error(`Falló el login en Supabase: ${error?.message ?? 'sesión no disponible'}`);
   }
 
-  const authorization = `Bearer ${data.session.access_token}`;
+  const headers = {
+    Authorization: `Bearer ${data.session.access_token}`,
+  };
 
-  const sessionResponse = await fetch(`${apiBaseUrl}/auth/session`, {
-    headers: {
-      Authorization: authorization,
-    },
-  });
+  const sessionResponse = await fetch(`${apiBaseUrl}/auth/session`, { headers });
 
-  const sessionBody = await readResponse(sessionResponse);
+  const sessionBody = await readBody(sessionResponse);
 
   if (!sessionResponse.ok) {
     throw new Error(
@@ -90,13 +84,9 @@ async function main(): Promise<void> {
     }
   ).data.user;
 
-  const newsResponse = await fetch(`${apiBaseUrl}/editor/news?page=1&pageSize=1`, {
-    headers: {
-      Authorization: authorization,
-    },
-  });
+  const newsResponse = await fetch(`${apiBaseUrl}/editor/news?page=1&pageSize=1`, { headers });
 
-  const newsBody = await readResponse(newsResponse);
+  const newsBody = await readBody(newsResponse);
 
   if (!newsResponse.ok) {
     throw new Error(
@@ -110,13 +100,7 @@ async function main(): Promise<void> {
         result: 'AUTH_SMOKE_OK',
         sessionStatus: sessionResponse.status,
         editorNewsStatus: newsResponse.status,
-        user: {
-          id: user.id,
-          email: user.email,
-          displayName: user.displayName,
-          role: user.role,
-          status: user.status,
-        },
+        user,
       },
       null,
       2,

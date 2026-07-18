@@ -21,18 +21,11 @@ export const paginationMetaSchema = z.object({
 
 export type PaginationMeta = z.infer<typeof paginationMetaSchema>;
 
-export const apiErrorCodeSchema = z.enum([
-  'VALIDATION_ERROR',
-  'UNAUTHORIZED',
-  'FORBIDDEN',
-  'NOT_FOUND',
-  'CONFLICT',
-  'LOCK_VERSION_CONFLICT',
-  'RATE_LIMIT_EXCEEDED',
-  'STORAGE_ERROR',
-  'IMPORT_DUPLICATE',
-  'INTERNAL_ERROR',
-]);
+export const apiErrorCodeSchema = z
+  .string()
+  .min(1)
+  .max(100)
+  .regex(/^[A-Z0-9_]+$/);
 
 export type ApiErrorCode = z.infer<typeof apiErrorCodeSchema>;
 

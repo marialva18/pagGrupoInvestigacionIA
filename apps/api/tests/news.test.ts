@@ -5,7 +5,11 @@ import test from 'node:test';
 import { createApp } from '../src/app.ts';
 import { authenticatedFetch, testAuthenticateAccessToken } from './helpers/test-auth.ts';
 import { mapMediaReference } from '../src/modules/media/media-reference.ts';
-import { createNewsSchema, updateNewsSchema } from '../src/modules/news/news.schema.ts';
+import {
+  createNewsSchema,
+  publishNewsSchema,
+  updateNewsSchema,
+} from '../src/modules/news/news.schema.ts';
 import { normalizeStoredRichTextBody } from '../src/common/content/rich-text-body.ts';
 
 const app = createApp({
@@ -288,29 +292,10 @@ test('accepts featured and nullable cover media in a news update', () => {
   assert.equal(result.success, true);
 });
 
-test('rejects a publish request without lock version', async () => {
-  await withApiServer(async (baseUrl) => {
-    const response = await authenticatedFetch(
-      `${baseUrl}/api/v1/editor/news/00000000-0000-4000-8000-000000000001/publish`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({}),
-      },
-    );
+test('accepts a publish request without an explicit lock version', () => {
+  const result = publishNewsSchema.safeParse({});
 
-    assert.equal(response.status, 400);
-
-    const body = (await response.json()) as {
-      error: {
-        code: string;
-      };
-    };
-
-    assert.equal(body.error.code, 'NEWS_PUBLISH_INVALID_INPUT');
-  });
+  assert.equal(result.success, true);
 });
 
 test('rejects an unpublish request without lock version', async () => {

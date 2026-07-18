@@ -107,6 +107,14 @@ enum EmailJobStatus {
   RETRYING
 }
 
+enum ExternalNewsStatus {
+  DISCOVERED
+  REVIEWED
+  IMPORTED
+  DISCARDED
+  FAILED
+}
+
 model User {
   id             String     @id @default(uuid()) @db.Uuid
   email          String     @unique @db.VarChar(320)
@@ -168,9 +176,10 @@ model ContentItem {
 
   coverMedia MediaAsset? @relation("ContentCoverMedia", fields: [coverMediaId], references: [id], onDelete: SetNull)
 
-  categories ContentCategory[]
-  media      ContentMedia[]
-  revisions  ContentRevision[]
+  categories        ContentCategory[]
+  media             ContentMedia[]
+  revisions         ContentRevision[]
+  externalNewsItems ExternalNewsItem[]
 
   @@index([type, status])
   @@index([status, publishedAt])
@@ -344,6 +353,36 @@ model ContentMedia {
   @@unique([contentId, mediaAssetId, role])
   @@index([contentId, role, position])
   @@index([mediaAssetId])
+}
+
+model ExternalNewsItem {
+  id               String             @id @default(uuid()) @db.Uuid
+  sourceKey        String             @db.VarChar(100)
+  externalId       String?            @db.VarChar(255)
+  canonicalUrl     String
+  canonicalUrlHash String             @unique @db.VarChar(64)
+  title            String             @db.VarChar(300)
+  summary          String?
+  publishedAt      DateTime?
+  contentHash      String?            @db.VarChar(64)
+  status           ExternalNewsStatus @default(DISCOVERED)
+  rawMetadata      Json?
+  failureReason    String?
+  firstSeenAt      DateTime           @default(now())
+  reviewedAt       DateTime?
+  importedAt       DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  contentId String?      @db.Uuid
+  content   ContentItem? @relation(fields: [contentId], references: [id], onDelete: SetNull)
+
+  @@index([sourceKey, externalId])
+  @@index([sourceKey, status])
+  @@index([status, firstSeenAt])
+  @@index([publishedAt])
+  @@index([contentHash])
+  @@index([contentId])
 }
 
 model ContactMessage {

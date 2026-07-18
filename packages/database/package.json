@@ -24,7 +24,8 @@
     "prisma:seed": "prisma db seed",
     "prebuild": "prisma generate",
     "pretypecheck": "prisma generate",
-    "precheck": "prisma generate"
+    "precheck": "prisma generate",
+    "prisma:seed:institutional": "tsx prisma/seed-institutional.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "latest",

@@ -6,7 +6,9 @@ import { authenticateAccessToken as defaultAuthenticateAccessToken } from '../mo
 import type { AuthenticateAccessToken } from '../modules/auth/auth.types.js';
 import { healthRouter } from '../modules/health/health.routes.js';
 import { mediaRouter } from '../modules/media/media.routes.js';
+import { membersRouter } from '../modules/members/members.routes.js';
 import { newsRouter } from '../modules/news/news.routes.js';
+import { publicContentRouter } from '../modules/public-content/public-content.routes.js';
 
 export interface ApiV1RouterOptions {
   enableEditorRoutes?: boolean;
@@ -22,11 +24,13 @@ export function createApiV1Router(options: ApiV1RouterOptions = {}): Router {
 
   router.use('/health', healthRouter);
   router.use('/auth', createAuthRouter(authenticate));
+  router.use('/public', publicContentRouter);
 
   if (enableEditorRoutes) {
     const requireAuthentication = createRequireAuthenticatedUser(authenticate);
 
     router.use('/editor/media', requireAuthentication, requireEditor, mediaRouter);
+    router.use('/editor/members', requireAuthentication, requireEditor, membersRouter);
 
     router.use('/editor/news', requireAuthentication, requireEditor, newsRouter);
   }

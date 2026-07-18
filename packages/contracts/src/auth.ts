@@ -19,3 +19,10 @@ export const authenticatedUserSchema = z.object({
 });
 
 export type AuthenticatedUser = z.infer<typeof authenticatedUserSchema>;
+
+export const cmsUserSchema = authenticatedUserSchema.extend({
+  createdAt: isoDateTimeSchema,
+  updatedAt: isoDateTimeSchema,
+});
+
+export type CmsUser = z.infer<typeof cmsUserSchema>;

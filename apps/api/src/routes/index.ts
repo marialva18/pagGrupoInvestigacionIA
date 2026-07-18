@@ -1,6 +1,11 @@
 import express, { type Router } from 'express';
+import { adminUsersRouter } from '../modules/admin-users/admin-users.routes.js';
 import { env } from '../config/env.js';
-import { createRequireAuthenticatedUser, requireEditor } from '../modules/auth/auth.middleware.js';
+import {
+  createRequireAuthenticatedUser,
+  requireAdmin,
+  requireEditor,
+} from '../modules/auth/auth.middleware.js';
 import { createAuthRouter } from '../modules/auth/auth.routes.js';
 import { authenticateAccessToken as defaultAuthenticateAccessToken } from '../modules/auth/auth.service.js';
 import type { AuthenticateAccessToken } from '../modules/auth/auth.types.js';
@@ -29,9 +34,10 @@ export function createApiV1Router(options: ApiV1RouterOptions = {}): Router {
   if (enableEditorRoutes) {
     const requireAuthentication = createRequireAuthenticatedUser(authenticate);
 
+    router.use('/admin/users', requireAuthentication, requireAdmin, adminUsersRouter);
+
     router.use('/editor/media', requireAuthentication, requireEditor, mediaRouter);
     router.use('/editor/members', requireAuthentication, requireEditor, membersRouter);
-
     router.use('/editor/news', requireAuthentication, requireEditor, newsRouter);
   }
 

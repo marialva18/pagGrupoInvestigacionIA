@@ -10,7 +10,7 @@
     "check": "tsc --noEmit",
     "lint": "eslint src tests",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test tests/foundation.test.ts tests/process-image.test.ts"
+    "test": "node --import tsx --test tests/foundation.test.ts tests/json.test.ts tests/process-image.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1088.0",
@@ -19,7 +19,8 @@
     "dotenv": "latest",
     "pino": "latest",
     "sharp": "^0.35.3",
-    "zod": "latest"
+    "zod": "latest",
+    "@intgarti/news-ingestion": "workspace:*"
   },
   "devDependencies": {
     "@eslint/js": "latest",

@@ -7,23 +7,14 @@ import {
   updateUserSchema,
   userIdParamsSchema,
 } from './admin-users.schema.js';
-import {
-  inviteUser,
-  listUsers,
-  resendInvitation,
-  updateUser,
-} from './admin-users.service.js';
+import { inviteUser, listUsers, resendInvitation, updateUser } from './admin-users.service.js';
 
 export const listUsersHandler: RequestHandler = (request, response, next) => {
   const parsed = listUsersQuerySchema.safeParse(request.query);
 
   if (!parsed.success) {
     next(
-      new AppError(
-        'Los filtros de usuarios no son válidos.',
-        400,
-        'ADMIN_USER_LIST_INVALID_QUERY',
-      ),
+      new AppError('Los filtros de usuarios no son válidos.', 400, 'ADMIN_USER_LIST_INVALID_QUERY'),
     );
 
     return;
@@ -68,13 +59,7 @@ export const resendInvitationHandler: RequestHandler = (request, response, next)
   const parsed = userIdParamsSchema.safeParse(request.params);
 
   if (!parsed.success) {
-    next(
-      new AppError(
-        'El identificador del usuario no es válido.',
-        400,
-        'ADMIN_USER_INVALID_ID',
-      ),
-    );
+    next(new AppError('El identificador del usuario no es válido.', 400, 'ADMIN_USER_INVALID_ID'));
 
     return;
   }
@@ -95,13 +80,7 @@ export const updateUserHandler: RequestHandler = (request, response, next) => {
   const parsedBody = updateUserSchema.safeParse(request.body);
 
   if (!parsedParams.success) {
-    next(
-      new AppError(
-        'El identificador del usuario no es válido.',
-        400,
-        'ADMIN_USER_INVALID_ID',
-      ),
-    );
+    next(new AppError('El identificador del usuario no es válido.', 400, 'ADMIN_USER_INVALID_ID'));
 
     return;
   }
@@ -118,11 +97,7 @@ export const updateUserHandler: RequestHandler = (request, response, next) => {
     return;
   }
 
-  void updateUser(
-    getAuthenticatedUser(request),
-    parsedParams.data.userId,
-    parsedBody.data,
-  )
+  void updateUser(getAuthenticatedUser(request), parsedParams.data.userId, parsedBody.data)
     .then((user) => {
       response.status(200).json({
         data: {

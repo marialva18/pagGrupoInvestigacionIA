@@ -144,11 +144,7 @@ export async function activateInvitation(accessToken: string): Promise<Authentic
     }
 
     if (localUser.status === 'SUSPENDED' || localUser.status === 'DISABLED') {
-      throw new AppError(
-        'El usuario no puede activar esta invitación.',
-        403,
-        'AUTH_USER_INACTIVE',
-      );
+      throw new AppError('El usuario no puede activar esta invitación.', 403, 'AUTH_USER_INACTIVE');
     }
 
     const activatedUser = await transaction.user.update({

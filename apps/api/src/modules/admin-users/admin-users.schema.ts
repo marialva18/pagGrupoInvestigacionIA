@@ -14,7 +14,12 @@ export const listUsersQuerySchema = z.object({
 });
 
 export const inviteUserSchema = z.object({
-  email: z.string().trim().email().max(320).transform((value) => value.toLowerCase()),
+  email: z
+    .string()
+    .trim()
+    .email()
+    .max(320)
+    .transform((value) => value.toLowerCase()),
   displayName: z.string().trim().min(2).max(160),
   role: userRoleSchema.default('EDITOR'),
 });

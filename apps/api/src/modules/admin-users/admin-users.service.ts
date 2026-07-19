@@ -3,11 +3,7 @@ import { getPrismaClient } from '@intgarti/database';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { AppError } from '../../common/errors/app-error.js';
 import { env } from '../../config/env.js';
-import type {
-  InviteUserInput,
-  ListUsersInput,
-  UpdateUserInput,
-} from './admin-users.schema.js';
+import type { InviteUserInput, ListUsersInput, UpdateUserInput } from './admin-users.schema.js';
 
 type AdminActor = Pick<AuthenticatedUser, 'id'>;
 
@@ -139,10 +135,7 @@ export async function listUsers(input: ListUsersInput) {
   };
 }
 
-export async function inviteUser(
-  actor: AdminActor,
-  input: InviteUserInput,
-): Promise<CmsUser> {
+export async function inviteUser(actor: AdminActor, input: InviteUserInput): Promise<CmsUser> {
   const prisma = getPrismaClient();
 
   const existing = await prisma.user.findUnique({

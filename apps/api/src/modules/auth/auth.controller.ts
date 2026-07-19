@@ -37,8 +37,7 @@ export const requestPasswordRecoveryHandler: RequestHandler = (request, response
     .then(() => {
       response.status(202).json({
         data: {
-          message:
-            'Si el correo pertenece a una cuenta habilitada, recibirá las instrucciones.',
+          message: 'Si el correo pertenece a una cuenta habilitada, recibirá las instrucciones.',
         },
       });
     })

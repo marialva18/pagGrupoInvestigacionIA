@@ -3,6 +3,12 @@ import { z } from 'zod';
 
 const booleanString = z.enum(['true', 'false']).transform((value) => value === 'true');
 
+const safeImagePixelLimit = z.coerce
+  .number()
+  .int()
+  .positive()
+  .transform((value) => Math.min(value, 16_000_000));
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 
@@ -22,9 +28,11 @@ const envSchema = z.object({
 
   S3_FORCE_PATH_STYLE: booleanString.default(true),
 
-  IMAGE_WORKER_POLL_MS: z.coerce.number().int().min(500).max(60_000).default(3000),
+  IMAGE_WORKER_POLL_MS: z.coerce.number().int().min(500).max(60_000).default(5000),
 
-  IMAGE_MAX_PIXELS: z.coerce.number().int().positive().default(40_000_000),
+  IMAGE_WORKER_MAX_JOBS_PER_PROCESS: z.coerce.number().int().min(1).max(20).default(1),
+
+  IMAGE_MAX_PIXELS: safeImagePixelLimit.default(16_000_000),
 });
 
 const parsed = envSchema.safeParse(process.env);

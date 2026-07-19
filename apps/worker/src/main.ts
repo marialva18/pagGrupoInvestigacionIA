@@ -8,6 +8,7 @@ const logger = pino({
 });
 
 let stopping = false;
+let processedJobs = 0;
 
 function sleep(milliseconds: number): Promise<void> {
   return new Promise((resolve) => {
@@ -38,6 +39,8 @@ async function runWorker(): Promise<void> {
   logger.info(
     {
       pollIntervalMs: env.IMAGE_WORKER_POLL_MS,
+      maxJobsPerProcess: env.IMAGE_WORKER_MAX_JOBS_PER_PROCESS,
+      maxPixels: env.IMAGE_MAX_PIXELS,
     },
     'INTGARTI image worker started.',
   );
@@ -47,7 +50,26 @@ async function runWorker(): Promise<void> {
       const result = await processNextImage();
 
       if (result) {
-        logger.info(result, 'Image processed successfully.');
+        processedJobs += 1;
+
+        logger.info(
+          {
+            ...result,
+            processedJobs,
+          },
+          'Image processed successfully.',
+        );
+
+        if (processedJobs >= env.IMAGE_WORKER_MAX_JOBS_PER_PROCESS) {
+          logger.info(
+            {
+              processedJobs,
+            },
+            'Worker job limit reached. Restarting to release native image memory.',
+          );
+
+          break;
+        }
 
         continue;
       }

@@ -6,7 +6,9 @@ import {
   createNewsSchema,
   listNewsQuerySchema,
   newsIdParamsSchema,
+  publishNewsSchema,
   restoreNewsSchema,
+  unpublishNewsSchema,
   updateNewsSchema,
 } from './news.schema.js';
 import {
@@ -15,7 +17,9 @@ import {
   getNewsById,
   listNews,
   listNewsRevisions,
+  publishNews,
   restoreNews,
+  unpublishNews,
   updateNews,
 } from './news.service.js';
 
@@ -188,6 +192,70 @@ export const listNewsRevisionsHandler: RequestHandler = (request, response, next
     .then((result) => {
       response.status(200).json({
         data: result,
+      });
+    })
+    .catch(next);
+};
+
+export const publishNewsHandler: RequestHandler = (request, response, next) => {
+  const parsedParams = newsIdParamsSchema.safeParse(request.params);
+
+  if (!parsedParams.success) {
+    next(new AppError('El identificador de la noticia no es válido.', 400, 'NEWS_INVALID_ID'));
+
+    return;
+  }
+
+  const parsedBody = publishNewsSchema.safeParse(request.body);
+
+  if (!parsedBody.success) {
+    next(
+      new AppError(
+        'Los datos para publicar la noticia no son válidos.',
+        400,
+        'NEWS_PUBLISH_INVALID_INPUT',
+      ),
+    );
+
+    return;
+  }
+
+  void publishNews(getAuthenticatedUser(request), parsedParams.data.newsId, parsedBody.data)
+    .then((news) => {
+      response.status(200).json({
+        data: news,
+      });
+    })
+    .catch(next);
+};
+
+export const unpublishNewsHandler: RequestHandler = (request, response, next) => {
+  const parsedParams = newsIdParamsSchema.safeParse(request.params);
+
+  if (!parsedParams.success) {
+    next(new AppError('El identificador de la noticia no es válido.', 400, 'NEWS_INVALID_ID'));
+
+    return;
+  }
+
+  const parsedBody = unpublishNewsSchema.safeParse(request.body);
+
+  if (!parsedBody.success) {
+    next(
+      new AppError(
+        'Los datos para despublicar la noticia no son válidos.',
+        400,
+        'NEWS_UNPUBLISH_INVALID_INPUT',
+      ),
+    );
+
+    return;
+  }
+
+  void unpublishNews(getAuthenticatedUser(request), parsedParams.data.newsId, parsedBody.data)
+    .then((news) => {
+      response.status(200).json({
+        data: news,
       });
     })
     .catch(next);

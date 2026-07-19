@@ -4,6 +4,7 @@ import type { AddressInfo } from 'node:net';
 import test from 'node:test';
 import { createApp } from '../src/app.ts';
 import { authenticatedFetch, testAuthenticateAccessToken } from './helpers/test-auth.ts';
+import { createNewsSchema, updateNewsSchema } from '../src/modules/news/news.schema.ts';
 
 const app = createApp({
   authenticateAccessToken: testAuthenticateAccessToken,
@@ -258,5 +259,79 @@ test('rejects an invalid identifier when listing revisions', async () => {
     };
 
     assert.equal(body.error.code, 'NEWS_INVALID_ID');
+  });
+});
+
+test('allows creating a draft without cover media', () => {
+  const result = createNewsSchema.safeParse({
+    title: 'Nuevo borrador académico',
+    summary: 'Resumen válido para crear una noticia académica todavía sin portada.',
+    body: {
+      version: 1,
+      blocks: [],
+    },
+    categoryIds: ['00000000-0000-4000-8000-000000000002'],
+  });
+
+  assert.equal(result.success, true);
+});
+
+test('accepts featured and nullable cover media in a news update', () => {
+  const result = updateNewsSchema.safeParse({
+    lockVersion: 1,
+    featured: true,
+    coverMediaId: null,
+  });
+
+  assert.equal(result.success, true);
+});
+
+test('rejects a publish request without lock version', async () => {
+  await withApiServer(async (baseUrl) => {
+    const response = await authenticatedFetch(
+      `${baseUrl}/api/v1/editor/news/00000000-0000-4000-8000-000000000001/publish`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      },
+    );
+
+    assert.equal(response.status, 400);
+
+    const body = (await response.json()) as {
+      error: {
+        code: string;
+      };
+    };
+
+    assert.equal(body.error.code, 'NEWS_PUBLISH_INVALID_INPUT');
+  });
+});
+
+test('rejects an unpublish request without lock version', async () => {
+  await withApiServer(async (baseUrl) => {
+    const response = await authenticatedFetch(
+      `${baseUrl}/api/v1/editor/news/00000000-0000-4000-8000-000000000001/unpublish`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      },
+    );
+
+    assert.equal(response.status, 400);
+
+    const body = (await response.json()) as {
+      error: {
+        code: string;
+      };
+    };
+
+    assert.equal(body.error.code, 'NEWS_UNPUBLISH_INVALID_INPUT');
   });
 });

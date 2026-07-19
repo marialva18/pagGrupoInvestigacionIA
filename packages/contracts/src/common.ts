@@ -15,8 +15,10 @@ export const slugSchema = z
 export const paginationMetaSchema = z.object({
   page: z.number().int().min(1),
   pageSize: z.number().int().min(1),
-  totalItems: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
   totalPages: z.number().int().nonnegative(),
+  hasPreviousPage: z.boolean(),
+  hasNextPage: z.boolean(),
 });
 
 export type PaginationMeta = z.infer<typeof paginationMetaSchema>;

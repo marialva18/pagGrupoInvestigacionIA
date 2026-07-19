@@ -22,6 +22,20 @@ const envSchema = z.object({
 
   SUPABASE_ANON_KEY: z.string().min(1).optional(),
 
+  SUPABASE_SECRET_KEY: z.string().min(1).optional(),
+
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+
+  AUTH_INVITE_REDIRECT_URL: z
+    .string()
+    .url()
+    .default('http://localhost:4321/auth/aceptar-invitacion'),
+
+  AUTH_PASSWORD_RESET_REDIRECT_URL: z
+    .string()
+    .url()
+    .default('http://localhost:4321/auth/restablecer-contrasena'),
+
   STORAGE_PROVIDER: z.enum(['minio', 'supabase']).default('minio'),
 
   S3_INTERNAL_ENDPOINT: z.string().url().default('http://minio:9000'),

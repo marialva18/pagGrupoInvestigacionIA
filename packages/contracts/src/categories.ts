@@ -10,6 +10,20 @@ export const categorySummarySchema = z.object({
 
 export type CategorySummary = z.infer<typeof categorySummarySchema>;
 
+export const categoryOptionSchema = z.object({
+  id: uuidSchema,
+  name: z.string().min(1).max(120),
+  slug: slugSchema,
+});
+
+export type CategoryOption = z.infer<typeof categoryOptionSchema>;
+
+export const categoryListSchema = z.object({
+  items: z.array(categoryOptionSchema),
+});
+
+export type CategoryList = z.infer<typeof categoryListSchema>;
+
 export const editorCategorySchema = categorySummarySchema.extend({
   active: z.boolean(),
   createdAt: isoDateTimeSchema,

@@ -153,3 +153,15 @@ export const restoreNewsSchema = z.object({
 });
 
 export type RestoreNewsInput = z.infer<typeof restoreNewsSchema>;
+
+export const publishNewsSchema = z.object({
+  lockVersion: z.number().int().min(1),
+});
+
+export type PublishNewsInput = z.infer<typeof publishNewsSchema>;
+
+export const unpublishNewsSchema = z.object({
+  lockVersion: z.number().int().min(1),
+});
+
+export type UnpublishNewsInput = z.infer<typeof unpublishNewsSchema>;

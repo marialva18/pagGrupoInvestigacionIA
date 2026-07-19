@@ -1,5 +1,5 @@
 import type { AuthenticatedUser } from '@intgarti/contracts';
-import type { RestoreNewsInput } from './news.schema.js';
+import type { PublishNewsInput, RestoreNewsInput, UnpublishNewsInput } from './news.schema.js';
 import { getPrismaClient } from '@intgarti/database';
 import { AppError } from '../../common/errors/app-error.js';
 import type {
@@ -1077,6 +1077,263 @@ export async function updateNews(actor: NewsActor, newsId: string, input: Update
     };
   });
 }
+export async function publishNews(actor: NewsActor, newsId: string, input: PublishNewsInput) {
+  const prisma = getPrismaClient();
+
+  await prisma.$transaction(async (transaction) => {
+    const accessCondition =
+      actor.role === 'ADMIN'
+        ? {}
+        : {
+            OR: [
+              {
+                createdById: actor.id,
+              },
+              {
+                assignedEditorId: actor.id,
+              },
+            ],
+          };
+
+    const existing = await transaction.contentItem.findFirst({
+      where: {
+        AND: [
+          {
+            id: newsId,
+          },
+          {
+            type: 'NEWS',
+          },
+          accessCondition,
+        ],
+      },
+      select: {
+        id: true,
+        status: true,
+        title: true,
+        lockVersion: true,
+        publishedAt: true,
+        coverMedia: {
+          select: {
+            id: true,
+            status: true,
+            archivedAt: true,
+            rightsStatus: true,
+          },
+        },
+        categories: {
+          select: {
+            category: {
+              select: {
+                id: true,
+                active: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!existing) {
+      throw new AppError('No se encontró la noticia solicitada.', 404, 'NEWS_NOT_FOUND');
+    }
+
+    if (existing.lockVersion !== input.lockVersion) {
+      throw new AppError(
+        'La noticia fue modificada por otro usuario. Actualiza la página antes de publicarla.',
+        409,
+        'NEWS_VERSION_CONFLICT',
+      );
+    }
+
+    if (existing.status !== 'DRAFT') {
+      throw new AppError(
+        'Solo pueden publicarse noticias en estado borrador.',
+        409,
+        'NEWS_NOT_DRAFT',
+      );
+    }
+
+    const activeCategories = existing.categories.filter(({ category }) => category.active);
+
+    if (activeCategories.length === 0) {
+      throw new AppError(
+        'La noticia debe tener al menos una categoría activa antes de publicarse.',
+        422,
+        'NEWS_PUBLISH_CATEGORY_REQUIRED',
+      );
+    }
+
+    const coverMedia = existing.coverMedia;
+
+    if (
+      !coverMedia ||
+      coverMedia.status !== 'READY' ||
+      coverMedia.archivedAt !== null ||
+      coverMedia.rightsStatus === 'RESTRICTED'
+    ) {
+      throw new AppError(
+        'La noticia debe tener una imagen de portada lista y habilitada antes de publicarse.',
+        422,
+        'NEWS_PUBLISH_COVER_REQUIRED',
+      );
+    }
+
+    const publishedAt = new Date();
+
+    const transition = await transaction.contentItem.updateMany({
+      where: {
+        id: newsId,
+        status: 'DRAFT',
+        lockVersion: input.lockVersion,
+      },
+      data: {
+        status: 'PUBLISHED',
+        publishedAt,
+        scheduledAt: null,
+        archivedAt: null,
+        lockVersion: {
+          increment: 1,
+        },
+      },
+    });
+
+    if (transition.count !== 1) {
+      throw new AppError(
+        'La noticia fue modificada durante la publicación.',
+        409,
+        'NEWS_VERSION_CONFLICT',
+      );
+    }
+
+    await transaction.auditLog.create({
+      data: {
+        actorId: actor.id,
+        action: 'NEWS_PUBLISHED',
+        entityType: 'ContentItem',
+        entityId: newsId,
+        before: {
+          status: existing.status,
+          publishedAt: existing.publishedAt?.toISOString() ?? null,
+          lockVersion: existing.lockVersion,
+        },
+        after: {
+          status: 'PUBLISHED',
+          publishedAt: publishedAt.toISOString(),
+          lockVersion: existing.lockVersion + 1,
+        },
+      },
+    });
+  });
+
+  return getNewsById(actor, newsId);
+}
+
+export async function unpublishNews(actor: NewsActor, newsId: string, input: UnpublishNewsInput) {
+  const prisma = getPrismaClient();
+
+  await prisma.$transaction(async (transaction) => {
+    const accessCondition =
+      actor.role === 'ADMIN'
+        ? {}
+        : {
+            OR: [
+              {
+                createdById: actor.id,
+              },
+              {
+                assignedEditorId: actor.id,
+              },
+            ],
+          };
+
+    const existing = await transaction.contentItem.findFirst({
+      where: {
+        AND: [
+          {
+            id: newsId,
+          },
+          {
+            type: 'NEWS',
+          },
+          accessCondition,
+        ],
+      },
+      select: {
+        id: true,
+        status: true,
+        lockVersion: true,
+        publishedAt: true,
+      },
+    });
+
+    if (!existing) {
+      throw new AppError('No se encontró la noticia solicitada.', 404, 'NEWS_NOT_FOUND');
+    }
+
+    if (existing.lockVersion !== input.lockVersion) {
+      throw new AppError(
+        'La noticia fue modificada por otro usuario. Actualiza la página antes de despublicarla.',
+        409,
+        'NEWS_VERSION_CONFLICT',
+      );
+    }
+
+    if (existing.status !== 'PUBLISHED') {
+      throw new AppError(
+        'Solo pueden despublicarse noticias publicadas.',
+        409,
+        'NEWS_NOT_PUBLISHED',
+      );
+    }
+
+    const transition = await transaction.contentItem.updateMany({
+      where: {
+        id: newsId,
+        status: 'PUBLISHED',
+        lockVersion: input.lockVersion,
+      },
+      data: {
+        status: 'DRAFT',
+        publishedAt: null,
+        scheduledAt: null,
+        lockVersion: {
+          increment: 1,
+        },
+      },
+    });
+
+    if (transition.count !== 1) {
+      throw new AppError(
+        'La noticia fue modificada durante la despublicación.',
+        409,
+        'NEWS_VERSION_CONFLICT',
+      );
+    }
+
+    await transaction.auditLog.create({
+      data: {
+        actorId: actor.id,
+        action: 'NEWS_UNPUBLISHED',
+        entityType: 'ContentItem',
+        entityId: newsId,
+        before: {
+          status: existing.status,
+          publishedAt: existing.publishedAt?.toISOString() ?? null,
+          lockVersion: existing.lockVersion,
+        },
+        after: {
+          status: 'DRAFT',
+          publishedAt: null,
+          lockVersion: existing.lockVersion + 1,
+        },
+      },
+    });
+  });
+
+  return getNewsById(actor, newsId);
+}
+
 export async function archiveNews(actor: NewsActor, newsId: string, input: ArchiveNewsInput) {
   const prisma = getPrismaClient();
 

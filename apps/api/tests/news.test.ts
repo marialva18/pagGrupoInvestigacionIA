@@ -285,3 +285,53 @@ test('accepts featured and nullable cover media in a news update', () => {
 
   assert.equal(result.success, true);
 });
+
+test('rejects a publish request without lock version', async () => {
+  await withApiServer(async (baseUrl) => {
+    const response = await authenticatedFetch(
+      `${baseUrl}/api/v1/editor/news/00000000-0000-4000-8000-000000000001/publish`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      },
+    );
+
+    assert.equal(response.status, 400);
+
+    const body = (await response.json()) as {
+      error: {
+        code: string;
+      };
+    };
+
+    assert.equal(body.error.code, 'NEWS_PUBLISH_INVALID_INPUT');
+  });
+});
+
+test('rejects an unpublish request without lock version', async () => {
+  await withApiServer(async (baseUrl) => {
+    const response = await authenticatedFetch(
+      `${baseUrl}/api/v1/editor/news/00000000-0000-4000-8000-000000000001/unpublish`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      },
+    );
+
+    assert.equal(response.status, 400);
+
+    const body = (await response.json()) as {
+      error: {
+        code: string;
+      };
+    };
+
+    assert.equal(body.error.code, 'NEWS_UNPUBLISH_INVALID_INPUT');
+  });
+});

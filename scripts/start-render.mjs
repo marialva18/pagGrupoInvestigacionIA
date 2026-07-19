@@ -1,28 +1,57 @@
 import { spawn } from 'node:child_process';
 
-const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+const imageWorkerEnabled = process.env.ENABLE_IMAGE_WORKER === 'true';
 
-const serviceDefinitions = [
-  {
-    name: 'api',
-    args: ['--filter', '@intgarti/api', 'start'],
-  },
-  {
-    name: 'image-worker',
-    args: ['--filter', '@intgarti/worker', 'start'],
-  },
-];
+const parsedRestartDelay = Number.parseInt(
+  process.env.IMAGE_WORKER_RESTART_DELAY_MS ?? '10000',
+  10,
+);
+
+const workerRestartDelayMs =
+  Number.isFinite(parsedRestartDelay) && parsedRestartDelay >= 1000 ? parsedRestartDelay : 10000;
 
 const children = new Map();
 
 let shuttingDown = false;
 let requestedExitCode = 0;
-let runningChildren = 0;
 let forceExitTimer;
+let workerRestartTimer;
+
+function createWorkerNodeOptions() {
+  const currentOptions = process.env.NODE_OPTIONS?.trim() ?? '';
+
+  if (currentOptions.includes('--max-old-space-size')) {
+    return currentOptions;
+  }
+
+  return [currentOptions, '--max-old-space-size=192'].filter(Boolean).join(' ');
+}
+
+const apiDefinition = {
+  name: 'api',
+  entry: 'apps/api/dist/server.js',
+  critical: true,
+  env: process.env,
+};
+
+const workerDefinition = {
+  name: 'image-worker',
+  entry: 'apps/worker/dist/main.js',
+  critical: false,
+  env: {
+    ...process.env,
+    MALLOC_ARENA_MAX: process.env.MALLOC_ARENA_MAX ?? '2',
+    NODE_OPTIONS: createWorkerNodeOptions(),
+  },
+};
 
 function completeShutdown() {
   if (forceExitTimer) {
     clearTimeout(forceExitTimer);
+  }
+
+  if (workerRestartTimer) {
+    clearTimeout(workerRestartTimer);
   }
 
   process.exit(requestedExitCode);
@@ -39,13 +68,18 @@ function initiateShutdown(exitCode = 0, signal = 'SIGTERM') {
 
   console.log(`[render] Deteniendo servicios con ${signal}.`);
 
+  if (workerRestartTimer) {
+    clearTimeout(workerRestartTimer);
+    workerRestartTimer = undefined;
+  }
+
   for (const child of children.values()) {
     if (child.exitCode === null && child.signalCode === null) {
       child.kill(signal);
     }
   }
 
-  if (runningChildren === 0) {
+  if (children.size === 0) {
     completeShutdown();
     return;
   }
@@ -65,43 +99,82 @@ function initiateShutdown(exitCode = 0, signal = 'SIGTERM') {
   forceExitTimer.unref();
 }
 
+function scheduleWorkerRestart() {
+  if (shuttingDown || !imageWorkerEnabled || workerRestartTimer) {
+    return;
+  }
+
+  console.log(
+    `[render] Reiniciando image-worker en ${workerRestartDelayMs} ms para liberar memoria.`,
+  );
+
+  workerRestartTimer = setTimeout(() => {
+    workerRestartTimer = undefined;
+    startService(workerDefinition);
+  }, workerRestartDelayMs);
+}
+
 function startService(definition) {
+  if (shuttingDown) {
+    return;
+  }
+
   console.log(`[render] Iniciando ${definition.name}.`);
 
-  const child = spawn(pnpmCommand, definition.args, {
+  const child = spawn(process.execPath, [definition.entry], {
     cwd: process.cwd(),
-    env: process.env,
+    env: definition.env,
     stdio: 'inherit',
   });
 
   children.set(definition.name, child);
-  runningChildren += 1;
 
-  child.once('error', (error) => {
-    console.error(`[render] No se pudo iniciar ${definition.name}.`, error);
+  let settled = false;
 
-    initiateShutdown(1);
-  });
+  function handleTermination(code, signal, error) {
+    if (settled) {
+      return;
+    }
 
-  child.once('exit', (code, signal) => {
-    children.delete(definition.name);
-    runningChildren -= 1;
+    settled = true;
 
-    if (!shuttingDown) {
-      console.error(
-        `[render] ${definition.name} terminó inesperadamente. Código: ${
+    if (children.get(definition.name) === child) {
+      children.delete(definition.name);
+    }
+
+    if (error) {
+      console.error(`[render] ${definition.name} no pudo iniciarse.`, error);
+    } else {
+      console.log(
+        `[render] ${definition.name} terminó. Código: ${
           code ?? 'sin código'
         }. Señal: ${signal ?? 'ninguna'}.`,
       );
-
-      const unexpectedExitCode = typeof code === 'number' && code !== 0 ? code : 1;
-
-      initiateShutdown(unexpectedExitCode);
     }
 
-    if (shuttingDown && runningChildren === 0) {
-      completeShutdown();
+    if (shuttingDown) {
+      if (children.size === 0) {
+        completeShutdown();
+      }
+
+      return;
     }
+
+    if (definition.critical) {
+      const exitCode = typeof code === 'number' && code !== 0 ? code : 1;
+      initiateShutdown(exitCode);
+      return;
+    }
+
+    scheduleWorkerRestart();
+  }
+
+  child.once('error', (error) => {
+    handleTermination(null, null, error);
+  });
+
+  child.once('exit', (code, signal) => {
+    handleTermination(code, signal, null);
   });
 }
 
@@ -113,6 +186,10 @@ process.once('SIGTERM', () => {
   initiateShutdown(0, 'SIGTERM');
 });
 
-for (const definition of serviceDefinitions) {
-  startService(definition);
+startService(apiDefinition);
+
+if (imageWorkerEnabled) {
+  startService(workerDefinition);
+} else {
+  console.log('[render] image-worker deshabilitado mediante ENABLE_IMAGE_WORKER.');
 }

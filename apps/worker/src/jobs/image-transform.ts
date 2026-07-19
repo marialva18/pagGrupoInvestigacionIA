@@ -1,6 +1,9 @@
 import { createHash } from 'node:crypto';
 import sharp from 'sharp';
 
+sharp.cache(false);
+sharp.concurrency(1);
+
 export const imageVariantSpecs = [
   {
     kind: 'THUMBNAIL',
@@ -86,6 +89,7 @@ export async function inspectOriginalImage(
 ): Promise<OriginalImageInfo> {
   const metadata = await sharp(input, {
     failOn: 'error',
+    sequentialRead: true,
     limitInputPixels: maxPixels,
   }).metadata();
 
@@ -125,6 +129,7 @@ export async function generateImageVariant(
 ): Promise<GeneratedImageVariant> {
   const result = await sharp(input, {
     failOn: 'error',
+    sequentialRead: true,
     limitInputPixels: maxPixels,
   })
     .rotate()
@@ -137,7 +142,7 @@ export async function generateImageVariant(
     })
     .webp({
       quality: spec.quality,
-      effort: 4,
+      effort: 2,
     })
     .toBuffer({
       resolveWithObject: true,

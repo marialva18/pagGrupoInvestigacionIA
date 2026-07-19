@@ -243,24 +243,33 @@ export async function resendInvitation(actor: AdminActor, userId: string): Promi
 
   const supabase = getSupabaseAdminClient();
 
-  const { error } = await supabase.auth.resend({
-    type: 'signup',
-    email: user.email,
-    options: {
-      emailRedirectTo: env.AUTH_INVITE_REDIRECT_URL,
+  const { data, error } = await supabase.auth.admin.inviteUserByEmail(user.email, {
+    data: {
+      display_name: user.displayName,
+      role: user.role,
     },
+    redirectTo: env.AUTH_INVITE_REDIRECT_URL,
   });
 
-  if (error) {
+  if (error || !data.user) {
     throw new AppError(
       'No fue posible reenviar la invitación.',
       502,
       'ADMIN_USER_INVITATION_RESEND_FAILED',
       {
-        providerMessage: error.message,
+        providerMessage: error?.message,
       },
     );
   }
+
+  await prisma.user.update({
+    where: {
+      id: user.id,
+    },
+    data: {
+      authProviderId: data.user.id,
+    },
+  });
 
   await prisma.auditLog.create({
     data: {

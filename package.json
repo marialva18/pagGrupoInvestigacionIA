@@ -28,7 +28,8 @@
     "docker:logs": "docker compose logs -f",
     "db:migrate": "pnpm --filter @intgarti/database prisma:migrate:dev",
     "db:seed": "pnpm --filter @intgarti/database prisma:seed",
-    "db:studio": "pnpm --filter @intgarti/database prisma:studio"
+    "db:studio": "pnpm --filter @intgarti/database prisma:studio",
+    "start:render": "node scripts/start-render.mjs"
   },
   "devDependencies": {
     "prettier": "latest",

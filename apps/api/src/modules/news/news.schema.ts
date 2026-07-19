@@ -34,7 +34,7 @@ export const createNewsSchema = z.object({
       message: 'Las categorías no pueden repetirse.',
     }),
 
-  coverMediaId: z.string().uuid(),
+  coverMediaId: z.string().uuid().nullable().optional(),
 
   seoTitle: z.string().trim().min(5).max(70).optional(),
 
@@ -108,7 +108,9 @@ export const updateNewsSchema = z
       })
       .optional(),
 
-    coverMediaId: z.string().uuid().optional(),
+    coverMediaId: z.string().uuid().nullable().optional(),
+
+    featured: z.boolean().optional(),
 
     seoTitle: z.string().trim().min(5).max(70).nullable().optional(),
 
@@ -122,6 +124,7 @@ export const updateNewsSchema = z
       value.body,
       value.categoryIds,
       value.coverMediaId,
+      value.featured,
       value.seoTitle,
       value.metaDescription,
     ].some((field) => field !== undefined);

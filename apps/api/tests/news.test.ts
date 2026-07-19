@@ -4,6 +4,7 @@ import type { AddressInfo } from 'node:net';
 import test from 'node:test';
 import { createApp } from '../src/app.ts';
 import { authenticatedFetch, testAuthenticateAccessToken } from './helpers/test-auth.ts';
+import { createNewsSchema, updateNewsSchema } from '../src/modules/news/news.schema.ts';
 
 const app = createApp({
   authenticateAccessToken: testAuthenticateAccessToken,
@@ -259,4 +260,28 @@ test('rejects an invalid identifier when listing revisions', async () => {
 
     assert.equal(body.error.code, 'NEWS_INVALID_ID');
   });
+});
+
+test('allows creating a draft without cover media', () => {
+  const result = createNewsSchema.safeParse({
+    title: 'Nuevo borrador académico',
+    summary: 'Resumen válido para crear una noticia académica todavía sin portada.',
+    body: {
+      version: 1,
+      blocks: [],
+    },
+    categoryIds: ['00000000-0000-4000-8000-000000000002'],
+  });
+
+  assert.equal(result.success, true);
+});
+
+test('accepts featured and nullable cover media in a news update', () => {
+  const result = updateNewsSchema.safeParse({
+    lockVersion: 1,
+    featured: true,
+    coverMediaId: null,
+  });
+
+  assert.equal(result.success, true);
 });

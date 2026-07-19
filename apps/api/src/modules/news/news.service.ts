@@ -61,35 +61,37 @@ export async function createNews(actor: NewsActor, input: CreateNewsInput) {
       );
     }
 
-    const coverMedia = await transaction.mediaAsset.findFirst({
-      where: {
-        id: input.coverMediaId,
-        status: 'READY',
-        archivedAt: null,
-        rightsStatus: {
-          not: 'RESTRICTED',
-        },
-      },
-      select: {
-        id: true,
-        objectKey: true,
-        altText: true,
-        status: true,
-        variants: {
+    const coverMedia = input.coverMediaId
+      ? await transaction.mediaAsset.findFirst({
+          where: {
+            id: input.coverMediaId,
+            status: 'READY',
+            archivedAt: null,
+            rightsStatus: {
+              not: 'RESTRICTED',
+            },
+          },
           select: {
-            kind: true,
+            id: true,
             objectKey: true,
-            width: true,
-            height: true,
+            altText: true,
+            status: true,
+            variants: {
+              select: {
+                kind: true,
+                objectKey: true,
+                width: true,
+                height: true,
+              },
+              orderBy: {
+                kind: 'asc',
+              },
+            },
           },
-          orderBy: {
-            kind: 'asc',
-          },
-        },
-      },
-    });
+        })
+      : null;
 
-    if (!coverMedia) {
+    if (input.coverMediaId && !coverMedia) {
       throw new AppError(
         'La imagen de portada no existe, no está lista o está restringida.',
         422,
@@ -148,7 +150,7 @@ export async function createNews(actor: NewsActor, input: CreateNewsInput) {
         featured: false,
         createdById: editor.id,
         assignedEditorId: editor.id,
-        coverMediaId: coverMedia.id,
+        coverMediaId: coverMedia?.id ?? null,
 
         categories: {
           create: input.categoryIds.map((categoryId) => ({
@@ -156,13 +158,17 @@ export async function createNews(actor: NewsActor, input: CreateNewsInput) {
           })),
         },
 
-        media: {
-          create: {
-            mediaAssetId: coverMedia.id,
-            role: 'COVER',
-            position: 0,
-          },
-        },
+        ...(coverMedia
+          ? {
+              media: {
+                create: {
+                  mediaAssetId: coverMedia.id,
+                  role: 'COVER',
+                  position: 0,
+                },
+              },
+            }
+          : {}),
       },
 
       select: {
@@ -234,7 +240,7 @@ export async function createNews(actor: NewsActor, input: CreateNewsInput) {
           slug: news.slug,
           title: news.title,
           categoryIds: input.categoryIds,
-          coverMediaId: coverMedia.id,
+          coverMediaId: coverMedia?.id ?? null,
           lockVersion: news.lockVersion,
         },
       },
@@ -654,6 +660,14 @@ export async function updateNews(actor: NewsActor, newsId: string, input: Update
       );
     }
 
+    if (existing.status === 'PUBLISHED' && input.coverMediaId === null) {
+      throw new AppError(
+        'Una noticia publicada no puede quedarse sin imagen de portada.',
+        422,
+        'NEWS_PUBLISHED_COVER_REQUIRED',
+      );
+    }
+
     if (input.categoryIds !== undefined) {
       const categories = await transaction.category.findMany({
         where: {
@@ -676,7 +690,7 @@ export async function updateNews(actor: NewsActor, newsId: string, input: Update
       }
     }
 
-    if (input.coverMediaId !== undefined) {
+    if (input.coverMediaId !== undefined && input.coverMediaId !== null) {
       const coverMedia = await transaction.mediaAsset.findFirst({
         where: {
           id: input.coverMediaId,
@@ -866,6 +880,12 @@ export async function updateNews(actor: NewsActor, newsId: string, input: Update
             }
           : {}),
 
+        ...(input.featured !== undefined
+          ? {
+              featured: input.featured,
+            }
+          : {}),
+
         ...(input.coverMediaId !== undefined
           ? {
               coverMediaId: input.coverMediaId,
@@ -905,14 +925,16 @@ export async function updateNews(actor: NewsActor, newsId: string, input: Update
         },
       });
 
-      await transaction.contentMedia.create({
-        data: {
-          contentId: newsId,
-          mediaAssetId: input.coverMediaId,
-          role: 'COVER',
-          position: 0,
-        },
-      });
+      if (input.coverMediaId !== null) {
+        await transaction.contentMedia.create({
+          data: {
+            contentId: newsId,
+            mediaAssetId: input.coverMediaId,
+            role: 'COVER',
+            position: 0,
+          },
+        });
+      }
     }
 
     const updated = await transaction.contentItem.findUnique({

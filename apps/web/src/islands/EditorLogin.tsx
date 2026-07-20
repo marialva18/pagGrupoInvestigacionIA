@@ -178,12 +178,12 @@ export default function EditorLogin() {
 
       <style>{`
         .editor-login-wrap{position:relative;width:min(100%,480px)}
-        .editor-login-form{width:100%;font-family:"Segoe UI","Source Sans 3",Arial,sans-serif}
+        .editor-login-form{width:100%;font-family:var(--font-body)}
         .editor-login-form__heading>span{color:var(--color-burgundy);font-size:.78rem;font-weight:800;letter-spacing:.13em;text-transform:uppercase}
-        .editor-login-form__heading h1{margin:11px 0 9px;color:var(--color-navy);font-family:"Segoe UI","Source Sans 3",Arial,sans-serif;font-size:clamp(2rem,4vw,2.45rem);font-weight:800;letter-spacing:-.04em;line-height:1.06}
+        .editor-login-form__heading h1{margin:11px 0 9px;color:var(--color-navy);font-family:var(--font-heading);font-size:clamp(2.4rem,5vw,3.35rem);font-weight:500;letter-spacing:-.05em;line-height:1}
         .editor-login-form__heading p{margin:0 0 31px;color:var(--color-muted);font-size:1rem;line-height:1.5}
         .editor-login-field{display:grid;gap:9px;margin-top:18px;color:var(--color-navy);font-size:.9rem;font-weight:750}
-        .editor-login-field>input,.editor-login-password{min-height:54px;border:1px solid var(--color-line);border-radius:12px;background:#fff;transition:border-color .15s ease,box-shadow .15s ease}
+        .editor-login-field>input,.editor-login-password{min-height:54px;border:1px solid var(--color-line);border-radius:2px;background:#fff;transition:border-color .15s ease,box-shadow .15s ease}
         .editor-login-field>input{width:100%;padding:0 15px;outline:none;color:var(--color-text);font-size:1rem}
         .editor-login-password{display:flex;align-items:center}
         .editor-login-password input{min-width:0;flex:1;height:52px;padding:0 15px;border:0;outline:0;background:transparent;font-size:1rem}
@@ -193,7 +193,7 @@ export default function EditorLogin() {
         .editor-login-options label{display:inline-flex;align-items:center;gap:9px;color:var(--color-muted);cursor:pointer}
         .editor-login-options input{width:16px;height:16px;accent-color:var(--color-burgundy)}
         .editor-login-options a{color:var(--color-burgundy);font-weight:800}
-        .editor-login-submit{width:100%;min-height:54px;border:0;border-radius:12px;color:#fff;background:var(--color-burgundy);font-size:.96rem;font-weight:800;cursor:pointer;transition:transform .15s ease,background-color .15s ease,box-shadow .15s ease}
+        .editor-login-submit{width:100%;min-height:54px;border:0;border-radius:2px;color:#fff;background:var(--color-burgundy);font-size:.96rem;font-weight:800;cursor:pointer;transition:transform .15s ease,background-color .15s ease,box-shadow .15s ease}
         .editor-login-submit:hover:not(:disabled){transform:translateY(-1px);background:var(--color-burgundy-dark);box-shadow:0 12px 28px rgb(119 37 54 / 22%)}
         .editor-login-submit:disabled{cursor:wait;opacity:.68}
         .editor-login-help{margin:20px 0 0;color:var(--color-muted);font-size:.8rem;text-align:center}

@@ -4,7 +4,6 @@ import {
   institutionProfileSchema,
   mediaReferenceSchema,
   type InstitutionProfileInput,
-  type MediaReference,
 } from '@intgarti/contracts';
 import { z } from 'zod';
 import { apiRequest } from '../lib/api-client';
@@ -15,7 +14,11 @@ const uploadSchema = z.object({
   uploadUrl: z.string().url(),
   requiredHeaders: z.record(z.string(), z.string()),
 });
-const mediaLibrarySchema = z.array(mediaReferenceSchema);
+const mediaLibraryItemSchema = mediaReferenceSchema.extend({
+  originalFilename: z.string().min(1),
+});
+const mediaLibrarySchema = z.array(mediaLibraryItemSchema);
+type MediaLibraryItem = z.infer<typeof mediaLibraryItemSchema>;
 const completedUploadSchema = z.object({
   mediaAssetId: z.string().uuid(),
   status: z.enum(['PROCESSING', 'READY']),
@@ -29,7 +32,7 @@ const wait = (milliseconds: number) =>
   new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
 export default function InstitutionManager() {
   const [form, setForm] = useState<InstitutionProfileInput | null>(null),
-    [mediaLibrary, setMediaLibrary] = useState<MediaReference[]>([]),
+    [mediaLibrary, setMediaLibrary] = useState<MediaLibraryItem[]>([]),
     [message, setMessage] = useState(''),
     [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -211,8 +214,8 @@ export default function InstitutionManager() {
           onChange={(e) => field('heroMediaId', e.target.value || null)}
         >
           <option value="">Sin fotografía principal</option>
-          {mediaLibrary.map((media, index) => (
-            <option value={media.id}>{media.altText ?? `Imagen de biblioteca ${index + 1}`}</option>
+          {mediaLibrary.map((media) => (
+            <option value={media.id}>{media.originalFilename}</option>
           ))}
         </select>
         {form.heroMediaId && mediaLibrary.find((media) => media.id === form.heroMediaId) && (
@@ -235,8 +238,8 @@ export default function InstitutionManager() {
           onChange={(e) => field('groupMediaId', e.target.value || null)}
         >
           <option value="">Sin fotografía del grupo</option>
-          {mediaLibrary.map((media, index) => (
-            <option value={media.id}>{media.altText ?? `Imagen de biblioteca ${index + 1}`}</option>
+          {mediaLibrary.map((media) => (
+            <option value={media.id}>{media.originalFilename}</option>
           ))}
         </select>
         {form.groupMediaId && mediaLibrary.find((media) => media.id === form.groupMediaId) && (

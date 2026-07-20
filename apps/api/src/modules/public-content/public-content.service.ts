@@ -304,39 +304,29 @@ export { listPublicMembers };
 export async function listPublicAcademicSources(): Promise<PublicAcademicSource[]> {
   const prisma = getPrismaClient();
 
-  const sources = await prisma.academicSource.findMany({
-    where: {
-      active: true,
-    },
-
-    orderBy: [
-      {
-        featured: 'desc',
+  const [sources, ingestionSources] = await Promise.all([
+    prisma.academicSource.findMany({
+      where: { active: true },
+      orderBy: [{ featured: 'desc' }, { displayOrder: 'asc' }, { name: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        url: true,
+        description: true,
+        featured: true,
+        displayOrder: true,
+        logoMedia: { select: mediaReferenceSelect },
       },
-      {
-        displayOrder: 'asc',
-      },
-      {
-        name: 'asc',
-      },
-    ],
+    }),
+    prisma.externalNewsSource.findMany({
+      where: { type: 'ACADEMIC', status: 'ACTIVE', deletedAt: null },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, websiteUrl: true },
+    }),
+  ]);
 
-    select: {
-      id: true,
-      name: true,
-      type: true,
-      url: true,
-      description: true,
-      featured: true,
-      displayOrder: true,
-
-      logoMedia: {
-        select: mediaReferenceSelect,
-      },
-    },
-  });
-
-  return sources.map((source) => ({
+  const publicSources: PublicAcademicSource[] = sources.map((source) => ({
     id: source.id,
     name: source.name,
     type: source.type,
@@ -347,4 +337,24 @@ export async function listPublicAcademicSources(): Promise<PublicAcademicSource[
 
     logoMedia: mapMediaReference(source.logoMedia),
   }));
+
+  const existingUrls = new Set(publicSources.map((source) => source.url.replace(/\/+$/, '')));
+
+  for (const [index, source] of ingestionSources.entries()) {
+    const normalizedUrl = source.websiteUrl.replace(/\/+$/, '');
+    if (existingUrls.has(normalizedUrl)) continue;
+
+    publicSources.push({
+      id: source.id,
+      name: source.name,
+      type: 'REPOSITORY',
+      url: source.websiteUrl,
+      description: 'Fuente académica autorizada por INTGARTI.',
+      featured: false,
+      displayOrder: sources.length + index,
+      logoMedia: null,
+    });
+  }
+
+  return publicSources;
 }

@@ -2,7 +2,9 @@ import { useEffect, useState, type FormEvent } from 'react';
 import {
   institutionProfileInputSchema,
   institutionProfileSchema,
+  mediaReferenceSchema,
   type InstitutionProfileInput,
+  type MediaReference,
 } from '@intgarti/contracts';
 import { z } from 'zod';
 import { apiRequest } from '../lib/api-client';
@@ -13,8 +15,10 @@ const uploadSchema = z.object({
   uploadUrl: z.string().url(),
   requiredHeaders: z.record(z.string(), z.string()),
 });
+const mediaLibrarySchema = z.array(mediaReferenceSchema);
 export default function InstitutionManager() {
   const [form, setForm] = useState<InstitutionProfileInput | null>(null),
+    [mediaLibrary, setMediaLibrary] = useState<MediaReference[]>([]),
     [message, setMessage] = useState(''),
     [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -25,6 +29,9 @@ export default function InstitutionManager() {
       .catch((e) =>
         setMessage(e instanceof Error ? e.message : 'No fue posible cargar el contenido.'),
       );
+    void apiRequest('/editor/media', mediaLibrarySchema, { accessToken: t })
+      .then(setMediaLibrary)
+      .catch(() => setMediaLibrary([]));
   }, []);
   function field<K extends keyof InstitutionProfileInput>(
     key: K,
@@ -170,6 +177,21 @@ export default function InstitutionManager() {
           accept="image/jpeg,image/png,image/webp"
           onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0], 'heroMediaId')}
         />
+        <select
+          value={form.heroMediaId ?? ''}
+          onChange={(e) => field('heroMediaId', e.target.value || null)}
+        >
+          <option value="">Sin fotografía principal</option>
+          {mediaLibrary.map((media, index) => (
+            <option value={media.id}>{media.altText ?? `Imagen de biblioteca ${index + 1}`}</option>
+          ))}
+        </select>
+        {form.heroMediaId && mediaLibrary.find((media) => media.id === form.heroMediaId) && (
+          <img
+            src={mediaLibrary.find((media) => media.id === form.heroMediaId)?.url}
+            alt="Vista previa de la fotografía principal"
+          />
+        )}
       </label>
       <label className="photo">
         Fotografía del grupo
@@ -178,6 +200,21 @@ export default function InstitutionManager() {
           accept="image/jpeg,image/png,image/webp"
           onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0], 'groupMediaId')}
         />
+        <select
+          value={form.groupMediaId ?? ''}
+          onChange={(e) => field('groupMediaId', e.target.value || null)}
+        >
+          <option value="">Sin fotografía del grupo</option>
+          {mediaLibrary.map((media, index) => (
+            <option value={media.id}>{media.altText ?? `Imagen de biblioteca ${index + 1}`}</option>
+          ))}
+        </select>
+        {form.groupMediaId && mediaLibrary.find((media) => media.id === form.groupMediaId) && (
+          <img
+            src={mediaLibrary.find((media) => media.id === form.groupMediaId)?.url}
+            alt="Vista previa de la fotografía del grupo"
+          />
+        )}
       </label>
       <footer>
         <button className="editorial-button" disabled={busy}>
@@ -185,7 +222,7 @@ export default function InstitutionManager() {
         </button>
       </footer>
       <EditorialToast message={message} onClose={() => setMessage('')} />
-      <style>{`.institution{padding:24px;display:grid;grid-template-columns:1fr 1fr;gap:18px}.institution .wide,.institution footer{grid-column:1/-1}.institution .photo{padding:18px;border:1px dashed var(--editorial-line);display:grid;gap:10px}.institution footer{display:flex;justify-content:flex-end}@media(max-width:650px){.institution{grid-template-columns:1fr}.institution .wide,.institution footer{grid-column:auto}}`}</style>
+      <style>{`.institution{padding:24px;display:grid;grid-template-columns:1fr 1fr;gap:18px}.institution .wide,.institution footer{grid-column:1/-1}.institution .photo{min-width:0;padding:18px;border:1px dashed var(--editorial-line);display:grid;gap:10px}.institution .photo input,.institution .photo select{max-width:100%}.institution .photo img{width:100%;height:220px;object-fit:cover;border-radius:8px}.institution footer{display:flex;justify-content:flex-end}@media(max-width:650px){.institution{grid-template-columns:1fr}.institution .wide,.institution footer{grid-column:auto}}`}</style>
     </form>
   );
 }

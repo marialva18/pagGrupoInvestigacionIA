@@ -1,51 +1,342 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import Footer from '../../components/public/Footer.astro';
+import Header from '../../components/public/Header.astro';
+import { listPublicNews } from '../../services/api/news.api';
+
+const q = Astro.url.searchParams.get('q')?.trim() ?? '';
+const requestedOrigin = Astro.url.searchParams.get('origin') ?? '';
+const origin =
+  requestedOrigin === 'INTERNAL' || requestedOrigin === 'EXTERNAL' ? requestedOrigin : '';
+const requestedYear = Astro.url.searchParams.get('year') ?? '';
+const parsedYear = /^\d{4}$/.test(requestedYear) ? Number(requestedYear) : undefined;
+const year = parsedYear ? String(parsedYear) : '';
+
+const emptyResult = {
+  items: [],
+  pagination: {
+    page: 1,
+    pageSize: 50,
+    total: 0,
+    totalPages: 0,
+    hasPreviousPage: false,
+    hasNextPage: false,
+  },
+};
+
+const [newsResult, yearResult] = await Promise.all([
+  listPublicNews({
+    pageSize: 50,
+    q: q || undefined,
+    origin: origin || undefined,
+    year: parsedYear,
+  }).catch(() => emptyResult),
+  listPublicNews({ pageSize: 50 }).catch(() => emptyResult),
+]);
+
+const news = newsResult.items;
+const availableYears = [
+  ...new Set(
+    yearResult.items
+      .map((item) => item.publishedAt?.slice(0, 4))
+      .filter((itemYear): itemYear is string => Boolean(itemYear)),
+  ),
+].sort((left, right) => Number(right) - Number(left));
+
+function formatDate(value: string | null): string {
+  if (!value) return 'Fecha pendiente';
+
+  return new Intl.DateTimeFormat('es-PE', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'America/Lima',
+  }).format(new Date(value));
+}
+
+function newsHref(item: (typeof news)[number]): string {
+  return item.origin === 'EXTERNAL' && item.source.url ? item.source.url : `/noticias/${item.slug}`;
+}
+
+function externalLinkAttributes(item: (typeof news)[number]) {
+  return item.origin === 'EXTERNAL' && item.source.url
+    ? { target: '_blank', rel: 'noopener noreferrer' }
+    : {};
+}
 ---
 
 <BaseLayout title="Historial de noticias | INTGARTI">
-  <main class="page">
-    <span>INTGARTI</span>
-    <h1>Historial de noticias</h1>
-    <p>Aquí se implementarán búsqueda, filtros, categorías, años y paginación.</p>
-    <a href="/">← Volver al inicio</a>
+  <Header />
+
+  <main>
+    <section class="hero">
+      <div class="container">
+        <span>Noticias y publicaciones</span>
+        <h1>Historial de noticias</h1>
+        <p>
+          Noticias institucionales de INTGARTI y publicaciones externas seleccionadas por el equipo
+          editorial.
+        </p>
+        <small>Las publicaciones externas enlazan siempre a su fuente original.</small>
+      </div>
+    </section>
+
+    <section class="content container">
+      <form class="filters" method="get">
+        <label>
+          Buscar
+          <input type="search" name="q" value={q} placeholder="Título, tema o fuente" />
+        </label>
+
+        <label>
+          Procedencia
+          <select name="origin">
+            <option value="" selected={!origin}>Todas</option>
+            <option value="INTERNAL" selected={origin === 'INTERNAL'}>INTGARTI</option>
+            <option value="EXTERNAL" selected={origin === 'EXTERNAL'}>Fuentes externas</option>
+          </select>
+        </label>
+
+        <label>
+          Año
+          <select name="year">
+            <option value="" selected={!year}>Todos</option>
+            {
+              availableYears.map((itemYear) => (
+                <option value={itemYear} selected={year === itemYear}>
+                  {itemYear}
+                </option>
+              ))
+            }
+          </select>
+        </label>
+
+        <button type="submit">Aplicar filtros</button>
+      </form>
+
+      <div class="news-list">
+        {
+          news.length > 0 ? (
+            news.map((item) => (
+              <article>
+                <div class="meta">
+                  <span>{item.source.name}</span>
+                  <time datetime={item.publishedAt ?? undefined}>
+                    {formatDate(item.publishedAt)}
+                  </time>
+                </div>
+
+                <h2>
+                  <a
+                    class="news-title-link"
+                    href={newsHref(item)}
+                    {...externalLinkAttributes(item)}
+                  >
+                    {item.title}
+                  </a>
+                </h2>
+
+                <p>{item.summary}</p>
+
+                <div class="footer-row">
+                  <span>
+                    {item.categories[0]?.name ?? 'Actualidad'} ·{' '}
+                    {item.origin === 'INTERNAL'
+                      ? 'Publicación institucional'
+                      : 'Publicación externa'}
+                  </span>
+                  <a href={newsHref(item)} {...externalLinkAttributes(item)}>
+                    {item.origin === 'EXTERNAL' ? `Leer en ${item.source.name} ↗` : 'Ver detalle →'}
+                  </a>
+                </div>
+              </article>
+            ))
+          ) : (
+            <div class="empty">No se encontraron noticias con los filtros seleccionados.</div>
+          )
+        }
+      </div>
+    </section>
   </main>
+
+  <Footer />
 </BaseLayout>
 
 <style>
-  .page {
-    width: min(calc(100% - 40px), 900px);
-    margin-inline: auto;
-    padding: 90px 0;
+  .hero {
+    padding: 68px 0 52px;
+    background: var(--color-ivory);
   }
 
-  span {
+  .hero .container {
+    width: min(calc(100% - 48px), 980px);
+  }
+
+  .hero span,
+  .meta span {
     color: var(--color-burgundy);
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 700;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+
+  h1,
+  h2 {
+    font-family: var(--font-heading);
+    font-weight: 500;
   }
 
   h1 {
-    margin: 18px 0;
+    max-width: 760px;
+    margin: 15px 0;
     color: var(--color-navy);
-    font-family: var(--font-heading);
-    font-size: clamp(3rem, 7vw, 6rem);
-    font-weight: 500;
-    line-height: 0.95;
+    font-size: clamp(2.45rem, 4.3vw, 4rem);
+    letter-spacing: -0.042em;
+    line-height: 1;
   }
 
-  p {
+  .hero p {
     max-width: 680px;
+    margin-bottom: 0;
     color: var(--color-muted);
-    font-size: 1.08rem;
+    font-size: 0.94rem;
+    line-height: 1.55;
   }
 
-  a {
+  .hero small {
     display: inline-block;
-    margin-top: 28px;
-    padding-bottom: 3px;
+    margin-top: 15px;
+    color: var(--color-burgundy);
+    font-size: 0.76rem;
+  }
+
+  .content {
+    width: min(calc(100% - 48px), 980px);
+    padding: 44px 0 90px;
+  }
+
+  .filters,
+  .news-list {
+    width: 100%;
+  }
+
+  .filters {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) 210px 140px auto;
+    align-items: end;
+    gap: 14px;
+    padding-bottom: 29px;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  label {
+    display: grid;
+    gap: 8px;
+    color: var(--color-navy);
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  input,
+  select,
+  button {
+    min-height: 43px;
+    padding: 0 13px;
+    border: 1px solid var(--color-line);
+    background: white;
+    font: inherit;
+  }
+
+  button {
+    padding-inline: 21px;
+    border-color: var(--color-burgundy);
+    color: white;
+    background: var(--color-burgundy);
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .news-list article {
+    display: grid;
+    gap: 12px;
+    padding: 30px 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .meta,
+  .footer-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+  }
+
+  .meta time,
+  .footer-row {
+    color: var(--color-muted);
+    font-size: 0.76rem;
+  }
+
+  h2 {
+    max-width: 800px;
+    margin: 0;
+    color: var(--color-navy);
+    font-size: clamp(1.45rem, 2.1vw, 2rem);
+    line-height: 1.15;
+  }
+
+  .news-title-link,
+  .news-title-link:link,
+  .news-title-link:visited,
+  .news-title-link:hover,
+  .news-title-link:active {
+    border-bottom: 0;
+    color: inherit;
+    text-decoration: none !important;
+    text-decoration-line: none !important;
+  }
+
+  .news-title-link:hover {
+    color: var(--color-burgundy);
+  }
+
+  article > p {
+    max-width: 760px;
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 0.91rem;
+    line-height: 1.5;
+  }
+
+  .footer-row a {
+    padding-bottom: 2px;
     border-bottom: 1px solid currentColor;
     color: var(--color-burgundy);
     font-weight: 700;
+    text-decoration: none;
+  }
+
+  .empty {
+    padding: 64px 0;
+    color: var(--color-muted);
+  }
+
+  @media (max-width: 800px) {
+    .filters {
+      grid-template-columns: 1fr;
+    }
+
+    .meta,
+    .footer-row {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .hero .container,
+    .content {
+      width: min(calc(100% - 28px), 980px);
+    }
   }
 </style>

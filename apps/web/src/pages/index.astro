@@ -2,24 +2,46 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Footer from '../components/public/Footer.astro';
 import Header from '../components/public/Header.astro';
+import { listPublicNews } from '../services/api/news.api';
 
-const recentNews = [
-  {
-    category: 'Investigación',
-    date: '16 JUL 2026',
-    title: 'Explora publicaciones recientes desde fuentes especializadas.',
+const newsResult = await listPublicNews({ pageSize: 4 }).catch(() => ({
+  items: [],
+  pagination: {
+    page: 1,
+    pageSize: 4,
+    total: 0,
+    totalPages: 0,
+    hasPreviousPage: false,
+    hasNextPage: false,
   },
-  {
-    category: 'INTGARTI',
-    date: '15 JUL 2026',
-    title: 'Información institucional y líneas de investigación en una sola vista.',
-  },
-  {
-    category: 'Actualidad',
-    date: '14 JUL 2026',
-    title: 'Noticias externas enlazadas a su publicación original.',
-  },
-];
+}));
+
+const featuredNews = newsResult.items.find((item) => item.featured) ?? newsResult.items[0] ?? null;
+const recentNews = newsResult.items.filter((item) => item.id !== featuredNews?.id).slice(0, 3);
+
+function formatNewsDate(value: string | null): string {
+  if (!value) return 'FECHA PENDIENTE';
+
+  return new Intl.DateTimeFormat('es-PE', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'America/Lima',
+  })
+    .format(new Date(value))
+    .replace('.', '')
+    .toUpperCase();
+}
+
+function newsHref(news: (typeof newsResult.items)[number]): string {
+  return news.origin === 'EXTERNAL' && news.source.url ? news.source.url : `/noticias/${news.slug}`;
+}
+
+function externalLinkAttributes(news: (typeof newsResult.items)[number]) {
+  return news.origin === 'EXTERNAL' && news.source.url
+    ? { target: '_blank', rel: 'noopener noreferrer' }
+    : {};
+}
 
 const sources = ['IEEE Xplore', 'ACM Digital Library', 'arXiv', 'Semantic Scholar'];
 ---
@@ -64,24 +86,80 @@ const sources = ['IEEE Xplore', 'ACM Digital Library', 'arXiv', 'Semantic Schola
         <div class="news-layout">
           <article class="featured-news">
             <span>Publicación destacada</span>
-            <h3>Noticias, investigación y comunidad académica.</h3>
-            <p>
-              La publicación destacada será seleccionada desde el espacio editorial y obtenida
-              mediante la API.
-            </p>
+            {
+              featuredNews ? (
+                <>
+                  <h3>
+                    <a
+                      class="news-title-link"
+                      href={newsHref(featuredNews)}
+                      {...externalLinkAttributes(featuredNews)}
+                    >
+                      {featuredNews.title}
+                    </a>
+                  </h3>
+                  <p>
+                    {featuredNews.summary ?? 'Publicación seleccionada por el equipo editorial.'}
+                  </p>
+                  <div class="featured-meta">
+                    <span>{featuredNews.source.name}</span>
+                    <time datetime={featuredNews.publishedAt ?? undefined}>
+                      {formatNewsDate(featuredNews.publishedAt)}
+                    </time>
+                    <a href={newsHref(featuredNews)} {...externalLinkAttributes(featuredNews)}>
+                      {featuredNews.origin === 'EXTERNAL'
+                        ? 'Leer en la fuente →'
+                        : 'Leer publicación →'}
+                    </a>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h3>Las publicaciones aparecerán después de ser aprobadas.</h3>
+                  <p>El equipo editorial todavía no ha publicado una noticia destacada.</p>
+                  <div class="featured-meta">
+                    <span>INTGARTI</span>
+                    <span>Contenido pendiente</span>
+                    <a href="/editor/publicaciones">Administrar noticias →</a>
+                  </div>
+                </>
+              )
+            }
           </article>
 
           <div class="news-list">
             {
-              recentNews.map((item) => (
+              recentNews.length > 0 ? (
+                recentNews.map((item) => (
+                  <article>
+                    <div>
+                      <span>{item.source.name}</span>
+                      <time datetime={item.publishedAt ?? undefined}>
+                        {formatNewsDate(item.publishedAt)}
+                      </time>
+                    </div>
+                    <h3>
+                      <a
+                        class="news-title-link"
+                        href={newsHref(item)}
+                        {...externalLinkAttributes(item)}
+                      >
+                        {item.title}
+                      </a>
+                    </h3>
+                  </article>
+                ))
+              ) : (
                 <article>
                   <div>
-                    <span>{item.category}</span>
-                    <time>{item.date}</time>
+                    <>
+                      <span>INTGARTI</span>
+                      <span>Sin publicaciones recientes</span>
+                    </>
                   </div>
-                  <h3>{item.title}</h3>
+                  <h3>Las noticias aprobadas se mostrarán automáticamente en esta sección.</h3>
                 </article>
-              ))
+              )
             }
           </div>
         </div>
@@ -299,7 +377,7 @@ const sources = ['IEEE Xplore', 'ACM Digital Library', 'arXiv', 'Semantic Schola
   h2 {
     max-width: 780px;
     color: var(--color-navy);
-    font-size: clamp(2.4rem, 4.2vw, 4.4rem);
+    font-size: clamp(2rem, 3.2vw, 3.2rem);
     letter-spacing: -0.04em;
     line-height: 1;
   }
@@ -308,19 +386,23 @@ const sources = ['IEEE Xplore', 'ACM Digital Library', 'arXiv', 'Semantic Schola
     padding-bottom: 4px;
     border-bottom: 1px solid currentColor;
     color: var(--color-navy);
+    font-size: 0.9rem;
     font-weight: 700;
     white-space: nowrap;
   }
 
   .news-layout {
     display: grid;
-    grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.5fr);
-    gap: 34px;
+    grid-template-columns: minmax(0, 1.65fr) minmax(290px, 0.75fr);
+    gap: 36px;
+    align-items: stretch;
   }
 
   .featured-news {
-    min-height: 500px;
-    padding: 48px;
+    display: flex;
+    min-height: 470px;
+    flex-direction: column;
+    padding: 44px;
     color: var(--color-white);
     background: var(--color-navy);
   }
@@ -334,16 +416,50 @@ const sources = ['IEEE Xplore', 'ACM Digital Library', 'arXiv', 'Semantic Schola
   }
 
   .featured-news h3 {
-    max-width: 650px;
-    margin-top: 125px;
-    font-size: clamp(2.6rem, 4vw, 4.4rem);
-    letter-spacing: -0.04em;
-    line-height: 1;
+    max-width: 610px;
+    margin-top: auto;
+    padding-top: 74px;
+    font-size: clamp(1.9rem, 2.7vw, 2.85rem);
+    letter-spacing: -0.035em;
+    line-height: 1.06;
+  }
+
+  .news-title-link,
+  .news-title-link:link,
+  .news-title-link:visited,
+  .news-title-link:hover,
+  .news-title-link:active {
+    border-bottom: 0;
+    color: inherit;
+    text-decoration: none !important;
+    text-decoration-line: none !important;
   }
 
   .featured-news p {
     max-width: 570px;
+    margin: 18px 0 0;
     color: rgb(255 255 255 / 68%);
+    font-size: 0.92rem;
+    line-height: 1.5;
+  }
+
+  .featured-meta {
+    display: flex;
+    margin-top: 26px;
+    align-items: center;
+    gap: 18px;
+    color: rgb(255 255 255 / 72%);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .featured-meta a {
+    margin-left: auto;
+    padding-bottom: 3px;
+    border-bottom: 1px solid currentColor;
+    color: var(--color-white);
   }
 
   .news-list {
@@ -368,8 +484,8 @@ const sources = ['IEEE Xplore', 'ACM Digital Library', 'arXiv', 'Semantic Schola
   .news-list h3 {
     margin-top: 10px;
     color: var(--color-navy);
-    font-size: 1.5rem;
-    line-height: 1.15;
+    font-size: 1.2rem;
+    line-height: 1.2;
   }
 
   .sources {
@@ -567,6 +683,16 @@ const sources = ['IEEE Xplore', 'ACM Digital Library', 'arXiv', 'Semantic Schola
     .section-heading {
       align-items: flex-start;
       flex-direction: column;
+    }
+
+    .featured-meta {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .featured-meta a {
+      margin-left: 0;
     }
 
     .source-grid,

@@ -2,6 +2,7 @@ import type { AuthenticatedUser } from '@intgarti/contracts';
 import type { PublishNewsInput, RestoreNewsInput, UnpublishNewsInput } from './news.schema.js';
 import { getPrismaClient } from '@intgarti/database';
 import { AppError } from '../../common/errors/app-error.js';
+import { mapMediaReference, mediaReferenceSelect } from '../media/media-reference.js';
 import {
   normalizeStoredRichTextBody,
   toDatabaseJsonObject,
@@ -75,23 +76,7 @@ export async function createNews(actor: NewsActor, input: CreateNewsInput) {
               not: 'RESTRICTED',
             },
           },
-          select: {
-            id: true,
-            objectKey: true,
-            altText: true,
-            status: true,
-            variants: {
-              select: {
-                kind: true,
-                objectKey: true,
-                width: true,
-                height: true,
-              },
-              orderBy: {
-                kind: 'asc',
-              },
-            },
-          },
+          select: mediaReferenceSelect,
         })
       : null;
 
@@ -210,23 +195,7 @@ export async function createNews(actor: NewsActor, input: CreateNewsInput) {
         },
 
         coverMedia: {
-          select: {
-            id: true,
-            objectKey: true,
-            altText: true,
-            status: true,
-            variants: {
-              select: {
-                kind: true,
-                objectKey: true,
-                width: true,
-                height: true,
-              },
-              orderBy: {
-                kind: 'asc',
-              },
-            },
-          },
+          select: mediaReferenceSelect,
         },
       },
     });
@@ -252,6 +221,7 @@ export async function createNews(actor: NewsActor, input: CreateNewsInput) {
 
     return {
       ...news,
+      coverMedia: mapMediaReference(news.coverMedia),
       categories: news.categories.map(({ category }) => category),
     };
   });
@@ -388,28 +358,7 @@ export async function listNews(actor: NewsActor, input: ListNewsInput) {
         },
 
         coverMedia: {
-          select: {
-            id: true,
-            altText: true,
-            status: true,
-
-            variants: {
-              where: {
-                kind: {
-                  in: ['THUMBNAIL', 'CARD'],
-                },
-              },
-              select: {
-                kind: true,
-                objectKey: true,
-                width: true,
-                height: true,
-              },
-              orderBy: {
-                kind: 'asc',
-              },
-            },
-          },
+          select: mediaReferenceSelect,
         },
       },
     }),
@@ -420,6 +369,7 @@ export async function listNews(actor: NewsActor, input: ListNewsInput) {
   return {
     items: newsItems.map((news) => ({
       ...news,
+      coverMedia: mapMediaReference(news.coverMedia),
 
       categories: news.categories.map(({ category }) => category),
     })),
@@ -533,32 +483,7 @@ export async function getNewsById(actor: NewsActor, newsId: string) {
       },
 
       coverMedia: {
-        select: {
-          id: true,
-          originalFilename: true,
-          objectKey: true,
-          mimeType: true,
-          width: true,
-          height: true,
-          altText: true,
-          caption: true,
-          credit: true,
-          rightsStatus: true,
-          status: true,
-
-          variants: {
-            select: {
-              kind: true,
-              objectKey: true,
-              mimeType: true,
-              width: true,
-              height: true,
-            },
-            orderBy: {
-              kind: 'asc',
-            },
-          },
-        },
+        select: mediaReferenceSelect,
       },
     },
   });
@@ -570,6 +495,7 @@ export async function getNewsById(actor: NewsActor, newsId: string) {
   return {
     ...news,
     body: normalizeStoredRichTextBody(news.body),
+    coverMedia: mapMediaReference(news.coverMedia),
 
     categories: news.categories.map(({ category }) => category),
   };
@@ -989,32 +915,7 @@ export async function updateNews(actor: NewsActor, newsId: string, input: Update
         },
 
         coverMedia: {
-          select: {
-            id: true,
-            originalFilename: true,
-            objectKey: true,
-            mimeType: true,
-            width: true,
-            height: true,
-            altText: true,
-            caption: true,
-            credit: true,
-            rightsStatus: true,
-            status: true,
-
-            variants: {
-              select: {
-                kind: true,
-                objectKey: true,
-                mimeType: true,
-                width: true,
-                height: true,
-              },
-              orderBy: {
-                kind: 'asc',
-              },
-            },
-          },
+          select: mediaReferenceSelect,
         },
       },
     });
@@ -1075,6 +976,7 @@ export async function updateNews(actor: NewsActor, newsId: string, input: Update
       historyRevision,
       ...updated,
       body: normalizeStoredRichTextBody(updated.body),
+      coverMedia: mapMediaReference(updated.coverMedia),
 
       categories: updated.categories.map(({ category }) => category),
     };

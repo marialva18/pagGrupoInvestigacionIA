@@ -4,6 +4,7 @@ import type { AddressInfo } from 'node:net';
 import test from 'node:test';
 import { createApp } from '../src/app.ts';
 import { authenticatedFetch, testAuthenticateAccessToken } from './helpers/test-auth.ts';
+import { mapMediaReference } from '../src/modules/media/media-reference.ts';
 import { createNewsSchema, updateNewsSchema } from '../src/modules/news/news.schema.ts';
 import { normalizeStoredRichTextBody } from '../src/common/content/rich-text-body.ts';
 
@@ -417,4 +418,39 @@ test('normalizes the legacy news body into TipTap', () => {
     paragraph.content?.[0]?.text,
     'Contenido anterior que debe seguir apareciendo públicamente.',
   );
+});
+
+test('maps an editorial cover into public URLs', () => {
+  const mapped = mapMediaReference({
+    id: '00000000-0000-4000-8000-000000000010',
+    bucket: 'intgarti-media',
+    objectKey: 'news/example/original image.webp',
+    altText: 'Imagen de portada',
+    caption: null,
+    credit: null,
+    rightsStatus: 'VERIFIED',
+    status: 'READY',
+    archivedAt: null,
+    width: 1200,
+    height: 800,
+    variants: [
+      {
+        id: '00000000-0000-4000-8000-000000000011',
+        kind: 'THUMBNAIL',
+        objectKey: 'news/example/thumbnail image.webp',
+        mimeType: 'image/webp',
+        sizeBytes: 2048n,
+        width: 320,
+        height: 213,
+      },
+    ],
+  });
+
+  assert.ok(mapped);
+  assert.equal(mapped.id, '00000000-0000-4000-8000-000000000010');
+  assert.ok(mapped.url.includes('original%20image.webp'));
+  assert.equal(mapped.variants.length, 1);
+  assert.equal(mapped.variants[0]?.kind, 'THUMBNAIL');
+  assert.ok(mapped.variants[0]?.url.includes('thumbnail%20image.webp'));
+  assert.equal('objectKey' in mapped, false);
 });

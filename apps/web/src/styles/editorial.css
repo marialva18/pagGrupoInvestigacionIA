@@ -29,7 +29,7 @@ body:has(.editorial-shell) {
   min-height: 100dvh;
   color: var(--editorial-text);
   background: var(--editorial-bg);
-  font-family: "Segoe UI", "Source Sans 3", Arial, sans-serif;
+  font-family: 'Segoe UI', 'Source Sans 3', Arial, sans-serif;
   font-size: 16px;
 }
 
@@ -250,7 +250,6 @@ body:has(.editorial-shell) {
   padding: 14px 14px 20px;
   border-top: 1px solid rgb(255 255 255 / 10%);
 }
-
 
 .editorial-main {
   min-height: 100vh;
@@ -479,7 +478,6 @@ body:has(.editorial-shell) {
   text-align: center;
 }
 
-
 @media (max-width: 900px) {
   .editorial-sidebar {
     transform: translateX(-100%);
@@ -520,15 +518,40 @@ body:has(.editorial-shell) {
   }
 }
 
-
 /* Ajustes de consistencia del panel */
-.editorial-content > * { min-width: 0; }
-.sources-manager, .publication-manager, .discovery-manager, .user-manager { position: relative; min-height: 260px; }
-.editorial-card button, .editorial-card input, .editorial-card select, .editorial-card textarea { font-family: inherit; }
-.editorial-button:focus-visible, .editorial-nav__item:focus-visible, .editorial-sidebar__footer a:focus-visible { outline: 3px solid rgb(119 37 54 / 22%); outline-offset: 2px; }
-.editorial-sidebar__footer a { color: rgb(255 255 255 / 84%); }
-.editorial-sidebar__footer a:hover { transform: none; }
+.editorial-content > * {
+  min-width: 0;
+}
+.sources-manager,
+.publication-manager,
+.discovery-manager,
+.user-manager {
+  position: relative;
+  min-height: 260px;
+}
+.editorial-card button,
+.editorial-card input,
+.editorial-card select,
+.editorial-card textarea {
+  font-family: inherit;
+}
+.editorial-button:focus-visible,
+.editorial-nav__item:focus-visible,
+.editorial-sidebar__footer a:focus-visible {
+  outline: 3px solid rgb(119 37 54 / 22%);
+  outline-offset: 2px;
+}
+.editorial-sidebar__footer a {
+  color: rgb(255 255 255 / 84%);
+}
+.editorial-sidebar__footer a:hover {
+  transform: none;
+}
 @media (max-width: 620px) {
-  .editorial-topbar h1 { font-size: 1.2rem; }
-  .editorial-content { padding: 16px; }
+  .editorial-topbar h1 {
+    font-size: 1.2rem;
+  }
+  .editorial-content {
+    padding: 16px;
+  }
 }

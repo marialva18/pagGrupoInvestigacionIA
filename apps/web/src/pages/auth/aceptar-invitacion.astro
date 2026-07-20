@@ -51,14 +51,51 @@ import InvitationActivation from '../../islands/InvitationActivation';
   }
 
   .account-visual__brand span,
-  .account-visual__brand small { display: block; }
-  .account-visual__brand span { font-size: 1rem; font-weight: 800; letter-spacing: .17em; }
-  .account-visual__brand small { margin-top: 4px; color: rgb(255 255 255 / 66%); font-size: .78rem; }
-  .account-visual > div { max-width: 490px; }
-  .account-visual > div > span { color: rgb(255 255 255 / 72%); font-size: .76rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
-  .account-visual h2 { margin: 16px 0 18px; color: #fff; font-family: var(--font-heading); font-size: clamp(2.35rem, 4vw, 3.55rem); font-weight: 550; letter-spacing: -.045em; line-height: 1.04; }
-  .account-visual p { margin: 0; color: rgb(255 255 255 / 78%); font-size: 1rem; line-height: 1.55; }
-  .account-visual > a:last-child { width: max-content; padding-bottom: 3px; border-bottom: 1px solid rgb(255 255 255 / 50%); font-size: .84rem; font-weight: 800; }
+  .account-visual__brand small {
+    display: block;
+  }
+  .account-visual__brand span {
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0.17em;
+  }
+  .account-visual__brand small {
+    margin-top: 4px;
+    color: rgb(255 255 255 / 66%);
+    font-size: 0.78rem;
+  }
+  .account-visual > div {
+    max-width: 490px;
+  }
+  .account-visual > div > span {
+    color: rgb(255 255 255 / 72%);
+    font-size: 0.76rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .account-visual h2 {
+    margin: 16px 0 18px;
+    color: #fff;
+    font-family: var(--font-heading);
+    font-size: clamp(2.35rem, 4vw, 3.55rem);
+    font-weight: 550;
+    letter-spacing: -0.045em;
+    line-height: 1.04;
+  }
+  .account-visual p {
+    margin: 0;
+    color: rgb(255 255 255 / 78%);
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+  .account-visual > a:last-child {
+    width: max-content;
+    padding-bottom: 3px;
+    border-bottom: 1px solid rgb(255 255 255 / 50%);
+    font-size: 0.84rem;
+    font-weight: 800;
+  }
 
   .account-panel {
     min-height: 100vh;
@@ -70,12 +107,28 @@ import InvitationActivation from '../../islands/InvitationActivation';
     background: radial-gradient(circle at 90% 8%, rgb(119 37 54 / 5%), transparent 28%), #fff;
   }
 
-  .account-mobile-brand { display: none; }
+  .account-mobile-brand {
+    display: none;
+  }
 
   @media (max-width: 760px) {
-    .account-page { display: block; }
-    .account-visual { display: none; }
-    .account-panel { padding: 32px 22px; }
-    .account-mobile-brand { position: absolute; top: 28px; display: inline-block; color: var(--color-burgundy); font-size: .92rem; font-weight: 800; letter-spacing: .15em; }
+    .account-page {
+      display: block;
+    }
+    .account-visual {
+      display: none;
+    }
+    .account-panel {
+      padding: 32px 22px;
+    }
+    .account-mobile-brand {
+      position: absolute;
+      top: 28px;
+      display: inline-block;
+      color: var(--color-burgundy);
+      font-size: 0.92rem;
+      font-weight: 800;
+      letter-spacing: 0.15em;
+    }
   }
 </style>

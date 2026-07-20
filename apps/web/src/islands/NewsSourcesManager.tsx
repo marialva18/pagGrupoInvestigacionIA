@@ -627,9 +627,7 @@ export default function NewsSourcesManager() {
                   </td>
                   <td>
                     <strong className="source-method">{methodLabel(source.ingestionMethod)}</strong>
-                    <small>
-                      {sourceTypeLabel(source.type)}
-                    </small>
+                    <small>{sourceTypeLabel(source.type)}</small>
                   </td>
                   <td>
                     <span
@@ -645,7 +643,8 @@ export default function NewsSourcesManager() {
                       onClick={() => openEdit(source)}
                       title="Cambiar frecuencia de actualización"
                     >
-                      <span aria-hidden="true">↻</span> {formatInterval(source.checkIntervalMinutes)}
+                      <span aria-hidden="true">↻</span>{' '}
+                      {formatInterval(source.checkIntervalMinutes)}
                     </button>
                   </td>
                   <td>

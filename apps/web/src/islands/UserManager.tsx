@@ -117,7 +117,9 @@ export default function UserManager() {
       await loadUsers(token);
       setMessage('Lista de usuarios actualizada correctamente.');
     } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible actualizar los usuarios.');
+      setMessage(
+        error instanceof Error ? error.message : 'No fue posible actualizar los usuarios.',
+      );
     } finally {
       setBusyId(null);
     }

@@ -14,11 +14,12 @@ const profile = await apiRequest('/public/institution', institutionProfileSchema
         <span>INTGARTI · UNMSM</span><h1>Investigación en inteligencia artificial</h1><p>
           {profile?.introduction}
         </p>
+        <a class="members-button" href="/miembros">Conocer a los miembros →</a>
       </div>{
-        profile?.heroMedia ? (
-          <img src={profile.heroMedia.url} alt={profile.heroMedia.altText ?? 'Grupo INTGARTI'} />
+        profile?.groupMedia ? (
+          <img src={profile.groupMedia.url} alt={profile.groupMedia.altText ?? 'Grupo INTGARTI'} />
         ) : (
-          <div class="photo">Fotografía institucional</div>
+          <div class="photo">Fotografía del grupo</div>
         )
       }
     </section><section class="section">
@@ -79,6 +80,23 @@ const profile = await apiRequest('/public/institution', institutionProfileSchema
   }
   .hero > div:first-child {
     padding: 90px max(24px, calc((100vw - var(--content-width)) / 2));
+  }
+  .hero > div:first-child {
+    display: flex;
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .members-button {
+    width: max-content;
+    min-height: 48px;
+    margin-top: 24px;
+    padding: 0 20px;
+    display: inline-flex;
+    align-items: center;
+    color: white;
+    background: var(--color-burgundy);
+    font-weight: 800;
   }
   .hero span,
   .section > div > span,

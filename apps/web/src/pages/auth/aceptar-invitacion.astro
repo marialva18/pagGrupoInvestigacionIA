@@ -1,0 +1,134 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import InvitationActivation from '../../islands/InvitationActivation';
+---
+
+<BaseLayout
+  title="Activar cuenta | INTGARTI"
+  description="Activa tu acceso al panel editorial de INTGARTI."
+>
+  <main class="account-page">
+    <aside class="account-visual" aria-label="Activación segura de acceso">
+      <a class="account-visual__brand" href="/">
+        <span>INTGARTI</span>
+        <small>Grupo de investigación</small>
+      </a>
+      <div>
+        <span>Acceso editorial</span>
+        <h2>Activa tu cuenta de forma segura.</h2>
+        <p>La invitación confirma tu acceso sin habilitar registros públicos.</p>
+      </div>
+      <a href="/acceso">← Volver al inicio de sesión</a>
+    </aside>
+
+    <section class="account-panel">
+      <a class="account-mobile-brand" href="/">INTGARTI</a>
+      <InvitationActivation client:load />
+    </section>
+  </main>
+</BaseLayout>
+
+<style>
+  .account-page {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: grid;
+    grid-template-columns: minmax(420px, 46%) minmax(520px, 54%);
+    background: #fff;
+  }
+
+  .account-visual {
+    position: relative;
+    min-height: 100vh;
+    padding: clamp(40px, 5vw, 72px);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    color: #fff;
+    background: var(--color-burgundy);
+    font-family: 'Segoe UI', 'Source Sans 3', Arial, sans-serif;
+  }
+
+  .account-visual__brand span,
+  .account-visual__brand small {
+    display: block;
+  }
+  .account-visual__brand span {
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0.17em;
+  }
+  .account-visual__brand small {
+    margin-top: 4px;
+    color: rgb(255 255 255 / 66%);
+    font-size: 0.78rem;
+  }
+  .account-visual > div {
+    max-width: 490px;
+  }
+  .account-visual > div > span {
+    color: rgb(255 255 255 / 72%);
+    font-size: 0.76rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .account-visual h2 {
+    margin: 16px 0 18px;
+    color: #fff;
+    font-family: var(--font-heading);
+    font-size: clamp(2.35rem, 4vw, 3.55rem);
+    font-weight: 550;
+    letter-spacing: -0.045em;
+    line-height: 1.04;
+  }
+  .account-visual p {
+    margin: 0;
+    color: rgb(255 255 255 / 78%);
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+  .account-visual > a:last-child {
+    width: max-content;
+    padding-bottom: 3px;
+    border-bottom: 1px solid rgb(255 255 255 / 50%);
+    font-size: 0.84rem;
+    font-weight: 800;
+  }
+
+  .account-panel {
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: clamp(32px, 5vw, 72px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 90% 8%, rgb(119 37 54 / 5%), transparent 28%), #fff;
+  }
+
+  .account-mobile-brand {
+    display: none;
+  }
+
+  @media (max-width: 760px) {
+    .account-page {
+      display: block;
+    }
+    .account-visual {
+      display: none;
+    }
+    .account-panel {
+      padding: 32px 22px;
+    }
+    .account-mobile-brand {
+      position: absolute;
+      top: 28px;
+      display: inline-block;
+      color: var(--color-burgundy);
+      font-size: 0.92rem;
+      font-weight: 800;
+      letter-spacing: 0.15em;
+    }
+  }
+</style>

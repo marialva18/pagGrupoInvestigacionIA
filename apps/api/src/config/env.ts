@@ -1,5 +1,15 @@
-import 'dotenv/config';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { config } from 'dotenv';
 import { z } from 'zod';
+
+const monorepoEnvPath = resolve(
+  fileURLToPath(new URL('.', import.meta.url)),
+  '../../../..',
+  '.env',
+);
+
+config({ path: monorepoEnvPath, quiet: true });
 
 const booleanString = z.enum(['true', 'false']).transform((value) => value === 'true');
 
@@ -64,7 +74,9 @@ const parsed = envSchema.safeParse(process.env);
 if (!parsed.success) {
   console.error('Invalid environment variables:', parsed.error.flatten().fieldErrors);
 
-  throw new Error('Invalid environment configuration');
+  throw new Error(
+    `Invalid environment configuration. Expected required variables to be available from ${monorepoEnvPath} or the process environment.`,
+  );
 }
 
 const parsedEnv = parsed.data;

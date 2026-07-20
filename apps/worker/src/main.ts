@@ -2,6 +2,8 @@ import pino from 'pino';
 import { getPrismaClient } from '@intgarti/database';
 import { env } from './config/env.js';
 import { processNextImage } from './jobs/process-image.job.js';
+import { ingestExternalNewsSources } from './jobs/ingest-external-news.job.js';
+import { archiveExpiredContent } from './jobs/archive-expired-content.job.js';
 
 const logger = pino({
   level: env.LOG_LEVEL,
@@ -9,6 +11,8 @@ const logger = pino({
 
 let stopping = false;
 let processedJobs = 0;
+let nextExternalNewsSyncAt = 0;
+let nextContentExpirationCheckAt = 0;
 
 function sleep(milliseconds: number): Promise<void> {
   return new Promise((resolve) => {
@@ -41,11 +45,40 @@ async function runWorker(): Promise<void> {
       pollIntervalMs: env.IMAGE_WORKER_POLL_MS,
       maxJobsPerProcess: env.IMAGE_WORKER_MAX_JOBS_PER_PROCESS,
       maxPixels: env.IMAGE_MAX_PIXELS,
+      externalNewsSyncEnabled: env.EXTERNAL_NEWS_SYNC_ENABLED,
+      externalNewsSyncIntervalMs: env.EXTERNAL_NEWS_SYNC_INTERVAL_MS,
+      contentExpirationCheckIntervalMs: env.CONTENT_EXPIRATION_CHECK_INTERVAL_MS,
     },
     'INTGARTI image worker started.',
   );
 
   while (!stopping) {
+    if (env.EXTERNAL_NEWS_SYNC_ENABLED && Date.now() >= nextExternalNewsSyncAt) {
+      try {
+        const ingestionResult = await ingestExternalNewsSources();
+
+        logger.info(ingestionResult, 'External news synchronization completed.');
+      } catch (error: unknown) {
+        logger.error({ error }, 'External news synchronization failed.');
+      } finally {
+        nextExternalNewsSyncAt = Date.now() + env.EXTERNAL_NEWS_SYNC_INTERVAL_MS;
+      }
+    }
+
+    if (Date.now() >= nextContentExpirationCheckAt) {
+      try {
+        const expirationResult = await archiveExpiredContent();
+
+        if (expirationResult.archived > 0) {
+          logger.info(expirationResult, 'Expired content archived.');
+        }
+      } catch (error: unknown) {
+        logger.error({ error }, 'Expired content archival failed.');
+      } finally {
+        nextContentExpirationCheckAt = Date.now() + env.CONTENT_EXPIRATION_CHECK_INTERVAL_MS;
+      }
+    }
+
     try {
       const result = await processNextImage();
 

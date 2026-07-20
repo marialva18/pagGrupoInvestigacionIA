@@ -13,6 +13,10 @@ export const publicNewsListQuerySchema = z.object({
   category: slugSchema.optional(),
 
   featured: booleanQuerySchema.optional(),
+
+  origin: z.enum(['INTERNAL', 'EXTERNAL']).optional(),
+
+  year: z.coerce.number().int().min(2000).max(2100).optional(),
 });
 
 export const publicNewsSlugParamsSchema = z.object({

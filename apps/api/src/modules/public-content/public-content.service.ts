@@ -1,14 +1,24 @@
 import {
+  richTextBodySchema,
   type PublicAcademicSource,
   type PublicNewsDetail,
   type PublicNewsSummary,
+  type RichTextBody,
 } from '@intgarti/contracts';
 import { getPrismaClient } from '@intgarti/database';
 import { AppError } from '../../common/errors/app-error.js';
-import { normalizeStoredRichTextBody } from '../../common/content/rich-text-body.js';
 import { mapMediaReference, mediaReferenceSelect } from '../media/media-reference.js';
 import { listPublicMembers } from '../members/members.service.js';
 import type { PublicNewsListInput } from './public-content.schema.js';
+
+const emptyRichTextBody: RichTextBody = {
+  schemaVersion: 1,
+  editor: 'tiptap',
+  document: {
+    type: 'doc',
+    content: [],
+  },
+};
 
 const publicNewsSelect = {
   id: true,
@@ -19,7 +29,14 @@ const publicNewsSelect = {
   seoTitle: true,
   metaDescription: true,
   featured: true,
+  origin: true,
+  externalUrl: true,
+  sourceName: true,
+  sourceType: true,
+  originalTitle: true,
+  externalPublishedAt: true,
   publishedAt: true,
+  expiresAt: true,
   updatedAt: true,
 
   categories: {
@@ -40,13 +57,35 @@ const publicNewsSelect = {
   },
 } as const;
 
+function parseRichTextBody(value: unknown): RichTextBody {
+  const parsed = richTextBodySchema.safeParse(value);
+
+  return parsed.success ? parsed.data : emptyRichTextBody;
+}
+
 function mapPublicNewsSummary(news: {
   id: string;
   slug: string;
   title: string;
   summary: string | null;
   featured: boolean;
+  origin: 'INTERNAL' | 'EXTERNAL';
+  externalUrl: string | null;
+  sourceName: string | null;
+  sourceType:
+    | 'ACADEMIC'
+    | 'NEWS_AGENCY'
+    | 'NEWS_MEDIA'
+    | 'CORPORATE_RESEARCH'
+    | 'CORPORATE_BLOG'
+    | 'GOVERNMENT'
+    | 'UNIVERSITY'
+    | 'OTHER'
+    | null;
+  originalTitle: string | null;
+  externalPublishedAt: Date | null;
   publishedAt: Date | null;
+  expiresAt: Date | null;
   updatedAt: Date;
 
   categories: Array<{
@@ -60,14 +99,31 @@ function mapPublicNewsSummary(news: {
 
   coverMedia: Parameters<typeof mapMediaReference>[0];
 }): PublicNewsSummary {
+  const normalizedSourceKey = (news.sourceName ?? 'fuente-externa')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
   return {
     id: news.id,
     slug: news.slug,
     title: news.title,
     summary: news.summary,
     featured: news.featured,
+    origin: news.origin,
+    source: {
+      key: news.origin === 'INTERNAL' ? 'intgarti' : normalizedSourceKey || 'fuente-externa',
+      name: news.sourceName ?? (news.origin === 'INTERNAL' ? 'INTGARTI' : 'Fuente externa'),
+      type: news.sourceType,
+      url: news.externalUrl,
+      originalTitle: news.originalTitle,
+      externalPublishedAt: news.externalPublishedAt?.toISOString() ?? null,
+    },
 
     publishedAt: news.publishedAt?.toISOString() ?? null,
+    expiresAt: news.expiresAt?.toISOString() ?? null,
 
     updatedAt: news.updatedAt.toISOString(),
 
@@ -90,9 +146,31 @@ export async function listPublicNews(input: PublicNewsListInput) {
       lte: now,
     },
 
+    AND: [
+      {
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
+    ],
+
     ...(input.featured !== undefined
       ? {
           featured: input.featured,
+        }
+      : {}),
+
+    ...(input.origin
+      ? {
+          origin: input.origin,
+        }
+      : {}),
+
+    ...(input.year
+      ? {
+          publishedAt: {
+            gte: new Date(`${input.year}-01-01T00:00:00.000Z`),
+            lt: new Date(`${input.year + 1}-01-01T00:00:00.000Z`),
+            lte: now,
+          },
         }
       : {}),
 
@@ -124,6 +202,24 @@ export async function listPublicNews(input: PublicNewsListInput) {
                 mode: 'insensitive' as const,
               },
             },
+            {
+              sourceName: {
+                contains: input.q,
+                mode: 'insensitive' as const,
+              },
+            },
+            {
+              categories: {
+                some: {
+                  category: {
+                    name: {
+                      contains: input.q,
+                      mode: 'insensitive' as const,
+                    },
+                  },
+                },
+              },
+            },
           ],
         }
       : {}),
@@ -131,31 +227,29 @@ export async function listPublicNews(input: PublicNewsListInput) {
 
   const skip = (input.page - 1) * input.pageSize;
 
-  const [total, newsItems] = await prisma.$transaction([
-    prisma.contentItem.count({
-      where,
-    }),
+  const total = await prisma.contentItem.count({
+    where,
+  });
 
-    prisma.contentItem.findMany({
-      where,
-      skip,
-      take: input.pageSize,
+  const newsItems = await prisma.contentItem.findMany({
+    where,
+    skip,
+    take: input.pageSize,
 
-      orderBy: [
-        {
-          featured: 'desc',
-        },
-        {
-          publishedAt: 'desc',
-        },
-        {
-          updatedAt: 'desc',
-        },
-      ],
+    orderBy: [
+      {
+        featured: 'desc',
+      },
+      {
+        publishedAt: 'desc',
+      },
+      {
+        updatedAt: 'desc',
+      },
+    ],
 
-      select: publicNewsSelect,
-    }),
-  ]);
+    select: publicNewsSelect,
+  });
 
   const totalPages = total === 0 ? 0 : Math.ceil(total / input.pageSize);
 
@@ -186,6 +280,8 @@ export async function getPublicNewsBySlug(slug: string): Promise<PublicNewsDetai
       publishedAt: {
         lte: new Date(),
       },
+
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
     },
 
     select: publicNewsSelect,
@@ -197,7 +293,7 @@ export async function getPublicNewsBySlug(slug: string): Promise<PublicNewsDetai
 
   return {
     ...mapPublicNewsSummary(news),
-    body: normalizeStoredRichTextBody(news.body),
+    body: parseRichTextBody(news.body),
     seoTitle: news.seoTitle,
     metaDescription: news.metaDescription,
   };

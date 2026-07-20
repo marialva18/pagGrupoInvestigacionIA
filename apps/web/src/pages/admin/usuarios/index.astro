@@ -1,0 +1,12 @@
+---
+import EditorialLayout from '../../../components/editorial/EditorialLayout.astro';
+import UserManager from '../../../islands/UserManager';
+---
+
+<EditorialLayout
+  title="Usuarios"
+  description="Invita administradores y editores, y controla su acceso al CMS."
+  activeSection="users"
+>
+  <UserManager client:load />
+</EditorialLayout>

@@ -5,6 +5,7 @@ export * from './categories.js';
 export * from './common.js';
 export * from './contact.js';
 export * from './content.js';
+export * from './external-news.js';
 export * from './importer.js';
 export * from './media.js';
 export * from './members.js';

@@ -8,6 +8,7 @@ import {
   newsIdParamsSchema,
   publishNewsSchema,
   restoreNewsSchema,
+  setNewsFeaturedSchema,
   unpublishNewsSchema,
   updateNewsSchema,
 } from './news.schema.js';
@@ -19,6 +20,7 @@ import {
   listNewsRevisions,
   publishNews,
   restoreNews,
+  setNewsFeatured,
   unpublishNews,
   updateNews,
 } from './news.service.js';
@@ -199,46 +201,33 @@ export const listNewsRevisionsHandler: RequestHandler = (request, response, next
 
 export const publishNewsHandler: RequestHandler = (request, response, next) => {
   const parsedParams = newsIdParamsSchema.safeParse(request.params);
+  const parsedBody = publishNewsSchema.safeParse(request.body ?? {});
 
   if (!parsedParams.success) {
     next(new AppError('El identificador de la noticia no es válido.', 400, 'NEWS_INVALID_ID'));
-
     return;
   }
 
-  const parsedBody = publishNewsSchema.safeParse(request.body);
-
   if (!parsedBody.success) {
     next(
-      new AppError(
-        'Los datos para publicar la noticia no son válidos.',
-        400,
-        'NEWS_PUBLISH_INVALID_INPUT',
-      ),
+      new AppError('Los datos de publicación no son válidos.', 400, 'NEWS_PUBLISH_INVALID_INPUT'),
     );
-
     return;
   }
 
   void publishNews(getAuthenticatedUser(request), parsedParams.data.newsId, parsedBody.data)
-    .then((news) => {
-      response.status(200).json({
-        data: news,
-      });
-    })
+    .then((news) => response.status(200).json({ data: news }))
     .catch(next);
 };
 
 export const unpublishNewsHandler: RequestHandler = (request, response, next) => {
   const parsedParams = newsIdParamsSchema.safeParse(request.params);
+  const parsedBody = unpublishNewsSchema.safeParse(request.body);
 
   if (!parsedParams.success) {
     next(new AppError('El identificador de la noticia no es válido.', 400, 'NEWS_INVALID_ID'));
-
     return;
   }
-
-  const parsedBody = unpublishNewsSchema.safeParse(request.body);
 
   if (!parsedBody.success) {
     next(
@@ -248,15 +237,29 @@ export const unpublishNewsHandler: RequestHandler = (request, response, next) =>
         'NEWS_UNPUBLISH_INVALID_INPUT',
       ),
     );
-
     return;
   }
 
   void unpublishNews(getAuthenticatedUser(request), parsedParams.data.newsId, parsedBody.data)
-    .then((news) => {
-      response.status(200).json({
-        data: news,
-      });
-    })
+    .then((news) => response.status(200).json({ data: news }))
+    .catch(next);
+};
+
+export const setNewsFeaturedHandler: RequestHandler = (request, response, next) => {
+  const parsedParams = newsIdParamsSchema.safeParse(request.params);
+  const parsedBody = setNewsFeaturedSchema.safeParse(request.body);
+
+  if (!parsedParams.success) {
+    next(new AppError('El identificador de la noticia no es válido.', 400, 'NEWS_INVALID_ID'));
+    return;
+  }
+
+  if (!parsedBody.success) {
+    next(new AppError('El estado destacado no es válido.', 400, 'NEWS_FEATURED_INVALID_INPUT'));
+    return;
+  }
+
+  void setNewsFeatured(getAuthenticatedUser(request), parsedParams.data.newsId, parsedBody.data)
+    .then((news) => response.status(200).json({ data: news }))
     .catch(next);
 };

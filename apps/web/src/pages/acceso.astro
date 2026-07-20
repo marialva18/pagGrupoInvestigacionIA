@@ -1,51 +1,181 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import EditorLogin from '../islands/EditorLogin';
 ---
 
-<BaseLayout title="Acceso editorial | INTGARTI">
-  <main class="page">
-    <span>INTGARTI</span>
-    <h1>Acceso editorial</h1>
-    <p>Inicio de sesión exclusivo para administradores y editores.</p>
-    <a href="/">← Volver al inicio</a>
+<BaseLayout
+  title="Acceso al panel | INTGARTI"
+  description="Inicio de sesión para administradores y editores de INTGARTI."
+>
+  <main class="access-layout">
+    <section class="access-visual" aria-label="Presentación del panel editorial">
+      <a class="access-brand" href="/">
+        <span>INTGARTI</span>
+        <small>Grupo de investigación</small>
+      </a>
+
+      <div class="access-visual__copy">
+        <span>Plataforma editorial</span>
+        <h2>Gestiona el contenido en un solo lugar.</h2>
+        <p>Publicaciones, fuentes confiables y usuarios con una interfaz clara y consistente.</p>
+      </div>
+
+      <a class="access-back" href="/">← Regresar al sitio</a>
+    </section>
+
+    <section class="access-panel" aria-label="Formulario de acceso">
+      <div class="access-panel__inner">
+        <a class="access-mobile-brand" href="/">INTGARTI</a>
+        <EditorLogin client:load />
+      </div>
+    </section>
   </main>
 </BaseLayout>
 
 <style>
-  .page {
-    width: min(calc(100% - 40px), 900px);
-    margin-inline: auto;
-    padding: 90px 0;
+  .access-layout {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: grid;
+    grid-template-columns: minmax(420px, 46%) minmax(520px, 54%);
+    background: #fff;
   }
 
-  span {
-    color: var(--color-burgundy);
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
+  .access-visual {
+    position: relative;
+    isolation: isolate;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: clamp(40px, 5vw, 72px);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    color: #fff;
+    background: var(--color-burgundy);
+    font-family: 'Segoe UI', 'Source Sans 3', Arial, sans-serif;
   }
 
-  h1 {
-    margin: 18px 0;
-    color: var(--color-navy);
+  .access-visual::before,
+  .access-visual::after {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    border: 1px solid rgb(255 255 255 / 13%);
+    border-radius: 50%;
+  }
+
+  .access-visual::before {
+    width: 500px;
+    height: 500px;
+    right: -260px;
+    top: -170px;
+  }
+
+  .access-visual::after {
+    width: 340px;
+    height: 340px;
+    left: -190px;
+    bottom: -145px;
+  }
+
+  .access-brand {
+    width: max-content;
+  }
+  .access-brand span,
+  .access-brand small {
+    display: block;
+  }
+  .access-brand span {
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0.17em;
+  }
+  .access-brand small {
+    margin-top: 4px;
+    color: rgb(255 255 255 / 66%);
+    font-size: 0.78rem;
+  }
+
+  .access-visual__copy {
+    max-width: 480px;
+  }
+  .access-visual__copy > span {
+    color: rgb(255 255 255 / 72%);
+    font-size: 0.76rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .access-visual__copy h2 {
+    margin: 16px 0 18px;
+    color: #fff;
     font-family: var(--font-heading);
-    font-size: clamp(3rem, 7vw, 6rem);
-    font-weight: 500;
-    line-height: 0.95;
+    font-size: clamp(2.35rem, 4vw, 3.55rem);
+    font-weight: 550;
+    letter-spacing: -0.045em;
+    line-height: 1.04;
+  }
+  .access-visual__copy p {
+    max-width: 430px;
+    margin: 0;
+    color: rgb(255 255 255 / 78%);
+    font-size: 1rem;
+    line-height: 1.55;
   }
 
-  p {
-    max-width: 680px;
-    color: var(--color-muted);
-    font-size: 1.08rem;
-  }
-
-  a {
-    display: inline-block;
-    margin-top: 28px;
+  .access-back {
+    width: max-content;
     padding-bottom: 3px;
-    border-bottom: 1px solid currentColor;
+    border-bottom: 1px solid rgb(255 255 255 / 50%);
+    color: #fff;
+    font-size: 0.84rem;
+    font-weight: 800;
+  }
+
+  .access-panel {
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: clamp(32px, 5vw, 72px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 90% 8%, rgb(119 37 54 / 5%), transparent 28%), #fff;
+  }
+
+  .access-panel__inner {
+    width: min(100%, 480px);
+  }
+  .access-mobile-brand {
+    display: none;
+    margin-bottom: 36px;
     color: var(--color-burgundy);
-    font-weight: 700;
+    font-size: 0.92rem;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+  }
+
+  @media (max-width: 900px) {
+    .access-layout {
+      grid-template-columns: minmax(330px, 42%) minmax(440px, 58%);
+    }
+    .access-visual {
+      padding: 38px;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .access-layout {
+      display: block;
+    }
+    .access-visual {
+      display: none;
+    }
+    .access-panel {
+      padding: 32px 22px;
+    }
+    .access-mobile-brand {
+      display: inline-block;
+    }
   }
 </style>

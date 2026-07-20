@@ -10,6 +10,8 @@ import { createAuthRouter } from '../modules/auth/auth.routes.js';
 import { authenticateAccessToken as defaultAuthenticateAccessToken } from '../modules/auth/auth.service.js';
 import type { AuthenticateAccessToken } from '../modules/auth/auth.types.js';
 import { categoriesRouter } from '../modules/categories/categories.routes.js';
+import { externalNewsRouter } from '../modules/external-news/external-news.routes.js';
+import { externalNewsSourcesRouter } from '../modules/external-news-sources/external-news-sources.routes.js';
 import { healthRouter } from '../modules/health/health.routes.js';
 import { mediaRouter } from '../modules/media/media.routes.js';
 import { membersRouter } from '../modules/members/members.routes.js';
@@ -38,6 +40,13 @@ export function createApiV1Router(options: ApiV1RouterOptions = {}): Router {
     router.use('/admin/users', requireAuthentication, requireAdmin, adminUsersRouter);
 
     router.use('/editor/categories', requireAuthentication, requireEditor, categoriesRouter);
+    router.use(
+      '/editor/news-sources',
+      requireAuthentication,
+      requireEditor,
+      externalNewsSourcesRouter,
+    );
+    router.use('/editor/external-news', requireAuthentication, requireEditor, externalNewsRouter);
     router.use('/editor/media', requireAuthentication, requireEditor, mediaRouter);
     router.use('/editor/members', requireAuthentication, requireEditor, membersRouter);
     router.use('/editor/news', requireAuthentication, requireEditor, newsRouter);

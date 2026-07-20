@@ -1,16 +1,15 @@
 import type { AuthenticatedUser } from '@intgarti/contracts';
-import type { PublishNewsInput, RestoreNewsInput, UnpublishNewsInput } from './news.schema.js';
+import type { RestoreNewsInput } from './news.schema.js';
 import { getPrismaClient } from '@intgarti/database';
 import { AppError } from '../../common/errors/app-error.js';
-import { mapMediaReference, mediaReferenceSelect } from '../media/media-reference.js';
-import {
-  normalizeStoredRichTextBody,
-  toDatabaseJsonObject,
-} from '../../common/content/rich-text-body.js';
+import { toJsonObject } from '../../common/json.js';
 import type {
   ArchiveNewsInput,
   CreateNewsInput,
   ListNewsInput,
+  PublishNewsInput,
+  SetNewsFeaturedInput,
+  UnpublishNewsInput,
   UpdateNewsInput,
 } from './news.schema.js';
 
@@ -44,48 +43,43 @@ export async function createNews(actor: NewsActor, input: CreateNewsInput) {
   return prisma.$transaction(async (transaction) => {
     const editor = actor;
 
-    const categories = await transaction.category.findMany({
-      where: {
-        id: {
-          in: input.categoryIds,
+    if (input.categoryIds.length > 0) {
+      const categoryCount = await transaction.category.count({
+        where: {
+          id: { in: input.categoryIds },
+          active: true,
         },
-        active: true,
-      },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-      },
-    });
+      });
 
-    if (categories.length !== input.categoryIds.length) {
-      throw new AppError(
-        'Una o más categorías no existen o están inactivas.',
-        422,
-        'NEWS_CATEGORY_INVALID',
-      );
+      if (categoryCount !== input.categoryIds.length) {
+        throw new AppError(
+          'Una o más categorías no existen o están inactivas.',
+          422,
+          'NEWS_CATEGORY_INVALID',
+        );
+      }
     }
 
-    const coverMedia = input.coverMediaId
-      ? await transaction.mediaAsset.findFirst({
-          where: {
-            id: input.coverMediaId,
-            status: 'READY',
-            archivedAt: null,
-            rightsStatus: {
-              not: 'RESTRICTED',
-            },
-          },
-          select: mediaReferenceSelect,
-        })
-      : null;
+    let coverMedia: { id: string } | null = null;
 
-    if (input.coverMediaId && !coverMedia) {
-      throw new AppError(
-        'La imagen de portada no existe, no está lista o está restringida.',
-        422,
-        'NEWS_COVER_MEDIA_INVALID',
-      );
+    if (input.coverMediaId) {
+      coverMedia = await transaction.mediaAsset.findFirst({
+        where: {
+          id: input.coverMediaId,
+          status: 'READY',
+          archivedAt: null,
+          rightsStatus: { not: 'RESTRICTED' },
+        },
+        select: { id: true },
+      });
+
+      if (!coverMedia) {
+        throw new AppError(
+          'La imagen de portada no existe, no está lista o está restringida.',
+          422,
+          'NEWS_COVER_MEDIA_INVALID',
+        );
+      }
     }
 
     const requestedSlug = normalizeSlug(input.slug ?? input.title);
@@ -100,16 +94,11 @@ export async function createNews(actor: NewsActor, input: CreateNewsInput) {
 
     let slug = requestedSlug;
 
-    for (let number = 1; number <= 100; number++) {
+    for (let number = 1; number <= 100; number += 1) {
       const candidate = createNumberedSlug(requestedSlug, number);
-
       const existing = await transaction.contentItem.findUnique({
-        where: {
-          slug: candidate,
-        },
-        select: {
-          id: true,
-        },
+        where: { slug: candidate },
+        select: { id: true },
       });
 
       if (!existing) {
@@ -122,31 +111,43 @@ export async function createNews(actor: NewsActor, input: CreateNewsInput) {
       }
     }
 
-    const seoTitle = input.seoTitle?.trim() ?? input.title.trim().slice(0, 70);
+    if (input.featured) {
+      await transaction.contentItem.updateMany({
+        where: { type: 'NEWS', featured: true, archivedAt: null },
+        data: { featured: false },
+      });
+    }
 
+    const seoTitle = input.seoTitle?.trim() ?? input.title.trim().slice(0, 70);
     const metaDescription = input.metaDescription?.trim() ?? input.summary.trim().slice(0, 180);
+    const publishDate = input.publishNow ? new Date() : null;
 
     const news = await transaction.contentItem.create({
       data: {
         type: 'NEWS',
-        status: 'DRAFT',
+        status: input.publishNow ? 'PUBLISHED' : 'DRAFT',
         slug,
         title: input.title.trim(),
         summary: input.summary.trim(),
-        body: toDatabaseJsonObject(input.body),
+        body: toJsonObject(input.body),
         seoTitle,
         metaDescription,
-        featured: false,
+        featured: input.featured,
+        origin: input.origin,
+        externalUrl: input.origin === 'EXTERNAL' ? (input.externalUrl ?? null) : null,
+        sourceName: input.origin === 'EXTERNAL' ? (input.sourceName ?? null) : 'INTGARTI',
+        sourceType: input.origin === 'EXTERNAL' ? (input.sourceType ?? null) : null,
+        originalTitle: input.origin === 'EXTERNAL' ? (input.originalTitle ?? null) : null,
+        externalPublishedAt:
+          input.origin === 'EXTERNAL' ? (input.externalPublishedAt ?? null) : null,
+        publishedAt: publishDate,
+        expiresAt: input.expiresAt ?? null,
         createdById: editor.id,
         assignedEditorId: editor.id,
         coverMediaId: coverMedia?.id ?? null,
-
         categories: {
-          create: input.categoryIds.map((categoryId) => ({
-            categoryId,
-          })),
+          create: input.categoryIds.map((categoryId) => ({ categoryId })),
         },
-
         ...(coverMedia
           ? {
               media: {
@@ -159,7 +160,6 @@ export async function createNews(actor: NewsActor, input: CreateNewsInput) {
             }
           : {}),
       },
-
       select: {
         id: true,
         type: true,
@@ -171,31 +171,38 @@ export async function createNews(actor: NewsActor, input: CreateNewsInput) {
         seoTitle: true,
         metaDescription: true,
         featured: true,
+        origin: true,
+        externalUrl: true,
+        sourceName: true,
+        sourceType: true,
+        originalTitle: true,
+        externalPublishedAt: true,
         lockVersion: true,
+        publishedAt: true,
+        expiresAt: true,
         createdAt: true,
         updatedAt: true,
-
         createdBy: {
-          select: {
-            id: true,
-            displayName: true,
-          },
+          select: { id: true, displayName: true },
         },
-
         categories: {
           select: {
             category: {
-              select: {
-                id: true,
-                name: true,
-                slug: true,
-              },
+              select: { id: true, name: true, slug: true },
             },
           },
         },
-
         coverMedia: {
-          select: mediaReferenceSelect,
+          select: {
+            id: true,
+            objectKey: true,
+            altText: true,
+            status: true,
+            variants: {
+              select: { kind: true, objectKey: true, width: true, height: true },
+              orderBy: { kind: 'asc' },
+            },
+          },
         },
       },
     });
@@ -203,15 +210,16 @@ export async function createNews(actor: NewsActor, input: CreateNewsInput) {
     await transaction.auditLog.create({
       data: {
         actorId: editor.id,
-        action: 'NEWS_CREATED',
+        action: input.publishNow ? 'NEWS_CREATED_AND_PUBLISHED' : 'NEWS_CREATED',
         entityType: 'ContentItem',
         entityId: news.id,
         after: {
           id: news.id,
-          type: news.type,
           status: news.status,
           slug: news.slug,
           title: news.title,
+          origin: news.origin,
+          featured: news.featured,
           categoryIds: input.categoryIds,
           coverMediaId: coverMedia?.id ?? null,
           lockVersion: news.lockVersion,
@@ -221,7 +229,10 @@ export async function createNews(actor: NewsActor, input: CreateNewsInput) {
 
     return {
       ...news,
-      coverMedia: mapMediaReference(news.coverMedia),
+      externalPublishedAt: news.externalPublishedAt?.toISOString() ?? null,
+      publishedAt: news.publishedAt?.toISOString() ?? null,
+      createdAt: news.createdAt.toISOString(),
+      updatedAt: news.updatedAt.toISOString(),
       categories: news.categories.map(({ category }) => category),
     };
   });
@@ -325,9 +336,12 @@ export async function listNews(actor: NewsActor, input: ListNewsInput) {
         title: true,
         summary: true,
         featured: true,
+        origin: true,
+        sourceName: true,
         lockVersion: true,
         scheduledAt: true,
         publishedAt: true,
+        expiresAt: true,
         createdAt: true,
         updatedAt: true,
 
@@ -358,7 +372,28 @@ export async function listNews(actor: NewsActor, input: ListNewsInput) {
         },
 
         coverMedia: {
-          select: mediaReferenceSelect,
+          select: {
+            id: true,
+            altText: true,
+            status: true,
+
+            variants: {
+              where: {
+                kind: {
+                  in: ['THUMBNAIL', 'CARD'],
+                },
+              },
+              select: {
+                kind: true,
+                objectKey: true,
+                width: true,
+                height: true,
+              },
+              orderBy: {
+                kind: 'asc',
+              },
+            },
+          },
         },
       },
     }),
@@ -369,7 +404,6 @@ export async function listNews(actor: NewsActor, input: ListNewsInput) {
   return {
     items: newsItems.map((news) => ({
       ...news,
-      coverMedia: mapMediaReference(news.coverMedia),
 
       categories: news.categories.map(({ category }) => category),
     })),
@@ -437,6 +471,7 @@ export async function getNewsById(actor: NewsActor, newsId: string) {
       lockVersion: true,
       scheduledAt: true,
       publishedAt: true,
+      expiresAt: true,
       archivedAt: true,
       createdAt: true,
       updatedAt: true,
@@ -483,7 +518,32 @@ export async function getNewsById(actor: NewsActor, newsId: string) {
       },
 
       coverMedia: {
-        select: mediaReferenceSelect,
+        select: {
+          id: true,
+          originalFilename: true,
+          objectKey: true,
+          mimeType: true,
+          width: true,
+          height: true,
+          altText: true,
+          caption: true,
+          credit: true,
+          rightsStatus: true,
+          status: true,
+
+          variants: {
+            select: {
+              kind: true,
+              objectKey: true,
+              mimeType: true,
+              width: true,
+              height: true,
+            },
+            orderBy: {
+              kind: 'asc',
+            },
+          },
+        },
       },
     },
   });
@@ -494,8 +554,6 @@ export async function getNewsById(actor: NewsActor, newsId: string) {
 
   return {
     ...news,
-    body: normalizeStoredRichTextBody(news.body),
-    coverMedia: mapMediaReference(news.coverMedia),
 
     categories: news.categories.map(({ category }) => category),
   };
@@ -508,6 +566,7 @@ type NewsRevisionSnapshot = {
   body: NonNullable<UpdateNewsInput['body']>;
   seoTitle: string | null;
   metaDescription: string | null;
+  expiresAt: string | null;
   featured: boolean;
   coverMediaId: string | null;
   categoryIds: string[];
@@ -559,6 +618,7 @@ export async function updateNews(actor: NewsActor, newsId: string, input: Update
         coverMediaId: true,
         scheduledAt: true,
         publishedAt: true,
+        expiresAt: true,
         archivedAt: true,
         createdAt: true,
         updatedAt: true,
@@ -588,14 +648,6 @@ export async function updateNews(actor: NewsActor, newsId: string, input: Update
         'La noticia está archivada. Debes restaurarla antes de editarla.',
         409,
         'NEWS_ARCHIVED_READ_ONLY',
-      );
-    }
-
-    if (existing.status === 'PUBLISHED' && input.coverMediaId === null) {
-      throw new AppError(
-        'Una noticia publicada no puede quedarse sin imagen de portada.',
-        422,
-        'NEWS_PUBLISHED_COVER_REQUIRED',
       );
     }
 
@@ -695,9 +747,17 @@ export async function updateNews(actor: NewsActor, newsId: string, input: Update
         slug: existing.slug,
         title: existing.title,
         summary: existing.summary ?? '',
-        body: normalizeStoredRichTextBody(existing.body),
+        body: (existing.body as NonNullable<UpdateNewsInput['body']> | null) ?? {
+          schemaVersion: 1,
+          editor: 'tiptap',
+          document: {
+            type: 'doc',
+            content: [],
+          },
+        },
         seoTitle: existing.seoTitle,
         metaDescription: existing.metaDescription,
+        expiresAt: existing.expiresAt?.toISOString() ?? null,
         featured: existing.featured,
         coverMediaId: existing.coverMediaId,
         categoryIds: existing.categories.map(({ categoryId }) => categoryId),
@@ -737,7 +797,7 @@ export async function updateNews(actor: NewsActor, newsId: string, input: Update
           version: (latestRevision?.version ?? 0) + 1,
           status: 'SUPERSEDED',
           sourceLockVersion: existing.lockVersion,
-          snapshot: toDatabaseJsonObject(previousSnapshot),
+          snapshot: toJsonObject(previousSnapshot),
           changeSummary:
             input.changeSummary?.trim() ??
             'Versión anterior guardada automáticamente antes de editar la publicación.',
@@ -792,7 +852,7 @@ export async function updateNews(actor: NewsActor, newsId: string, input: Update
 
         ...(input.body !== undefined
           ? {
-              body: toDatabaseJsonObject(input.body),
+              body: toJsonObject(input.body),
             }
           : {}),
 
@@ -808,15 +868,9 @@ export async function updateNews(actor: NewsActor, newsId: string, input: Update
             }
           : {}),
 
-        ...(input.featured !== undefined
+        ...(input.expiresAt !== undefined
           ? {
-              featured: input.featured,
-            }
-          : {}),
-
-        ...(input.coverMediaId !== undefined
-          ? {
-              coverMediaId: input.coverMediaId,
+              expiresAt: input.expiresAt,
             }
           : {}),
       },
@@ -846,6 +900,26 @@ export async function updateNews(actor: NewsActor, newsId: string, input: Update
     }
 
     if (input.coverMediaId !== undefined) {
+      await transaction.contentItem.update({
+        where: {
+          id: newsId,
+        },
+        data:
+          input.coverMediaId === null
+            ? {
+                coverMedia: {
+                  disconnect: true,
+                },
+              }
+            : {
+                coverMedia: {
+                  connect: {
+                    id: input.coverMediaId,
+                  },
+                },
+              },
+      });
+
       await transaction.contentMedia.deleteMany({
         where: {
           contentId: newsId,
@@ -883,6 +957,7 @@ export async function updateNews(actor: NewsActor, newsId: string, input: Update
         lockVersion: true,
         scheduledAt: true,
         publishedAt: true,
+        expiresAt: true,
         archivedAt: true,
         createdAt: true,
         updatedAt: true,
@@ -915,7 +990,32 @@ export async function updateNews(actor: NewsActor, newsId: string, input: Update
         },
 
         coverMedia: {
-          select: mediaReferenceSelect,
+          select: {
+            id: true,
+            originalFilename: true,
+            objectKey: true,
+            mimeType: true,
+            width: true,
+            height: true,
+            altText: true,
+            caption: true,
+            credit: true,
+            rightsStatus: true,
+            status: true,
+
+            variants: {
+              select: {
+                kind: true,
+                objectKey: true,
+                mimeType: true,
+                width: true,
+                height: true,
+              },
+              orderBy: {
+                kind: 'asc',
+              },
+            },
+          },
         },
       },
     });
@@ -943,6 +1043,7 @@ export async function updateNews(actor: NewsActor, newsId: string, input: Update
           body: existing.body,
           seoTitle: existing.seoTitle,
           metaDescription: existing.metaDescription,
+          expiresAt: existing.expiresAt,
           coverMediaId: existing.coverMediaId,
 
           categoryIds: existing.categories.map(({ categoryId }) => categoryId),
@@ -957,6 +1058,7 @@ export async function updateNews(actor: NewsActor, newsId: string, input: Update
           body: updated.body,
           seoTitle: updated.seoTitle,
           metaDescription: updated.metaDescription,
+          expiresAt: updated.expiresAt,
 
           coverMediaId: updated.coverMedia?.id ?? null,
 
@@ -975,270 +1077,11 @@ export async function updateNews(actor: NewsActor, newsId: string, input: Update
 
       historyRevision,
       ...updated,
-      body: normalizeStoredRichTextBody(updated.body),
-      coverMedia: mapMediaReference(updated.coverMedia),
 
       categories: updated.categories.map(({ category }) => category),
     };
   });
 }
-export async function publishNews(actor: NewsActor, newsId: string, input: PublishNewsInput) {
-  const prisma = getPrismaClient();
-
-  await prisma.$transaction(async (transaction) => {
-    const accessCondition =
-      actor.role === 'ADMIN'
-        ? {}
-        : {
-            OR: [
-              {
-                createdById: actor.id,
-              },
-              {
-                assignedEditorId: actor.id,
-              },
-            ],
-          };
-
-    const existing = await transaction.contentItem.findFirst({
-      where: {
-        AND: [
-          {
-            id: newsId,
-          },
-          {
-            type: 'NEWS',
-          },
-          accessCondition,
-        ],
-      },
-      select: {
-        id: true,
-        status: true,
-        title: true,
-        lockVersion: true,
-        publishedAt: true,
-        coverMedia: {
-          select: {
-            id: true,
-            status: true,
-            archivedAt: true,
-            rightsStatus: true,
-          },
-        },
-        categories: {
-          select: {
-            category: {
-              select: {
-                id: true,
-                active: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!existing) {
-      throw new AppError('No se encontró la noticia solicitada.', 404, 'NEWS_NOT_FOUND');
-    }
-
-    if (existing.lockVersion !== input.lockVersion) {
-      throw new AppError(
-        'La noticia fue modificada por otro usuario. Actualiza la página antes de publicarla.',
-        409,
-        'NEWS_VERSION_CONFLICT',
-      );
-    }
-
-    if (existing.status !== 'DRAFT') {
-      throw new AppError(
-        'Solo pueden publicarse noticias en estado borrador.',
-        409,
-        'NEWS_NOT_DRAFT',
-      );
-    }
-
-    const activeCategories = existing.categories.filter(({ category }) => category.active);
-
-    if (activeCategories.length === 0) {
-      throw new AppError(
-        'La noticia debe tener al menos una categoría activa antes de publicarse.',
-        422,
-        'NEWS_PUBLISH_CATEGORY_REQUIRED',
-      );
-    }
-
-    const coverMedia = existing.coverMedia;
-
-    if (
-      !coverMedia ||
-      coverMedia.status !== 'READY' ||
-      coverMedia.archivedAt !== null ||
-      coverMedia.rightsStatus === 'RESTRICTED'
-    ) {
-      throw new AppError(
-        'La noticia debe tener una imagen de portada lista y habilitada antes de publicarse.',
-        422,
-        'NEWS_PUBLISH_COVER_REQUIRED',
-      );
-    }
-
-    const publishedAt = new Date();
-
-    const transition = await transaction.contentItem.updateMany({
-      where: {
-        id: newsId,
-        status: 'DRAFT',
-        lockVersion: input.lockVersion,
-      },
-      data: {
-        status: 'PUBLISHED',
-        publishedAt,
-        scheduledAt: null,
-        archivedAt: null,
-        lockVersion: {
-          increment: 1,
-        },
-      },
-    });
-
-    if (transition.count !== 1) {
-      throw new AppError(
-        'La noticia fue modificada durante la publicación.',
-        409,
-        'NEWS_VERSION_CONFLICT',
-      );
-    }
-
-    await transaction.auditLog.create({
-      data: {
-        actorId: actor.id,
-        action: 'NEWS_PUBLISHED',
-        entityType: 'ContentItem',
-        entityId: newsId,
-        before: {
-          status: existing.status,
-          publishedAt: existing.publishedAt?.toISOString() ?? null,
-          lockVersion: existing.lockVersion,
-        },
-        after: {
-          status: 'PUBLISHED',
-          publishedAt: publishedAt.toISOString(),
-          lockVersion: existing.lockVersion + 1,
-        },
-      },
-    });
-  });
-
-  return getNewsById(actor, newsId);
-}
-
-export async function unpublishNews(actor: NewsActor, newsId: string, input: UnpublishNewsInput) {
-  const prisma = getPrismaClient();
-
-  await prisma.$transaction(async (transaction) => {
-    const accessCondition =
-      actor.role === 'ADMIN'
-        ? {}
-        : {
-            OR: [
-              {
-                createdById: actor.id,
-              },
-              {
-                assignedEditorId: actor.id,
-              },
-            ],
-          };
-
-    const existing = await transaction.contentItem.findFirst({
-      where: {
-        AND: [
-          {
-            id: newsId,
-          },
-          {
-            type: 'NEWS',
-          },
-          accessCondition,
-        ],
-      },
-      select: {
-        id: true,
-        status: true,
-        lockVersion: true,
-        publishedAt: true,
-      },
-    });
-
-    if (!existing) {
-      throw new AppError('No se encontró la noticia solicitada.', 404, 'NEWS_NOT_FOUND');
-    }
-
-    if (existing.lockVersion !== input.lockVersion) {
-      throw new AppError(
-        'La noticia fue modificada por otro usuario. Actualiza la página antes de despublicarla.',
-        409,
-        'NEWS_VERSION_CONFLICT',
-      );
-    }
-
-    if (existing.status !== 'PUBLISHED') {
-      throw new AppError(
-        'Solo pueden despublicarse noticias publicadas.',
-        409,
-        'NEWS_NOT_PUBLISHED',
-      );
-    }
-
-    const transition = await transaction.contentItem.updateMany({
-      where: {
-        id: newsId,
-        status: 'PUBLISHED',
-        lockVersion: input.lockVersion,
-      },
-      data: {
-        status: 'DRAFT',
-        publishedAt: null,
-        scheduledAt: null,
-        lockVersion: {
-          increment: 1,
-        },
-      },
-    });
-
-    if (transition.count !== 1) {
-      throw new AppError(
-        'La noticia fue modificada durante la despublicación.',
-        409,
-        'NEWS_VERSION_CONFLICT',
-      );
-    }
-
-    await transaction.auditLog.create({
-      data: {
-        actorId: actor.id,
-        action: 'NEWS_UNPUBLISHED',
-        entityType: 'ContentItem',
-        entityId: newsId,
-        before: {
-          status: existing.status,
-          publishedAt: existing.publishedAt?.toISOString() ?? null,
-          lockVersion: existing.lockVersion,
-        },
-        after: {
-          status: 'DRAFT',
-          publishedAt: null,
-          lockVersion: existing.lockVersion + 1,
-        },
-      },
-    });
-  });
-
-  return getNewsById(actor, newsId);
-}
-
 export async function archiveNews(actor: NewsActor, newsId: string, input: ArchiveNewsInput) {
   const prisma = getPrismaClient();
 
@@ -1339,6 +1182,7 @@ export async function archiveNews(actor: NewsActor, newsId: string, input: Archi
         lockVersion: true,
         scheduledAt: true,
         publishedAt: true,
+        expiresAt: true,
         archivedAt: true,
         createdAt: true,
         updatedAt: true,
@@ -1435,6 +1279,7 @@ export async function restoreNews(actor: NewsActor, newsId: string, input: Resto
         lockVersion: true,
         archivedAt: true,
         publishedAt: true,
+        expiresAt: true,
       },
     });
 
@@ -1498,6 +1343,7 @@ export async function restoreNews(actor: NewsActor, newsId: string, input: Resto
         lockVersion: true,
         scheduledAt: true,
         publishedAt: true,
+        expiresAt: true,
         archivedAt: true,
         createdAt: true,
         updatedAt: true,
@@ -1553,6 +1399,365 @@ export async function restoreNews(actor: NewsActor, newsId: string, input: Resto
 
       categories: restored.categories.map(({ category }) => category),
     };
+  });
+}
+
+export async function publishNews(actor: NewsActor, newsId: string, input: PublishNewsInput) {
+  const prisma = getPrismaClient();
+
+  return prisma.$transaction(async (transaction) => {
+    const accessCondition =
+      actor.role === 'ADMIN'
+        ? {}
+        : {
+            OR: [{ createdById: actor.id }, { assignedEditorId: actor.id }],
+          };
+
+    const existing = await transaction.contentItem.findFirst({
+      where: {
+        AND: [{ id: newsId }, { type: 'NEWS' }, accessCondition],
+      },
+      select: {
+        id: true,
+        status: true,
+        origin: true,
+        featured: true,
+        lockVersion: true,
+        publishedAt: true,
+        expiresAt: true,
+        archivedAt: true,
+        coverMedia: {
+          select: {
+            id: true,
+            status: true,
+            archivedAt: true,
+            rightsStatus: true,
+          },
+        },
+        categories: {
+          select: {
+            category: {
+              select: {
+                active: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!existing) {
+      throw new AppError('No se encontró la noticia solicitada.', 404, 'NEWS_NOT_FOUND');
+    }
+
+    if (input.lockVersion !== undefined && existing.lockVersion !== input.lockVersion) {
+      throw new AppError(
+        'La noticia fue modificada por otro usuario. Actualiza la página antes de publicarla.',
+        409,
+        'NEWS_VERSION_CONFLICT',
+      );
+    }
+
+    if (existing.archivedAt || existing.status === 'ARCHIVED') {
+      throw new AppError('La noticia está archivada.', 409, 'NEWS_ARCHIVED_READ_ONLY');
+    }
+
+    if (existing.status !== 'DRAFT') {
+      throw new AppError(
+        'Solo pueden publicarse noticias en estado borrador.',
+        409,
+        'NEWS_NOT_DRAFT',
+      );
+    }
+
+    if (existing.expiresAt && existing.expiresAt <= new Date()) {
+      throw new AppError(
+        'La fecha de caducidad ya terminó. Actualízala antes de publicar.',
+        422,
+        'NEWS_EXPIRATION_IN_PAST',
+      );
+    }
+
+    if (existing.origin === 'INTERNAL') {
+      const hasActiveCategory = existing.categories.some(({ category }) => category.active);
+
+      if (!hasActiveCategory) {
+        throw new AppError(
+          'La noticia interna debe tener al menos una categoría activa antes de publicarse.',
+          422,
+          'NEWS_PUBLISH_CATEGORY_REQUIRED',
+        );
+      }
+
+      const coverMedia = existing.coverMedia;
+
+      if (
+        !coverMedia ||
+        coverMedia.status !== 'READY' ||
+        coverMedia.archivedAt !== null ||
+        coverMedia.rightsStatus === 'RESTRICTED'
+      ) {
+        throw new AppError(
+          'La noticia interna debe tener una imagen de portada lista y habilitada antes de publicarse.',
+          422,
+          'NEWS_PUBLISH_COVER_REQUIRED',
+        );
+      }
+    }
+
+    const featured = input.featured ?? existing.featured;
+
+    if (featured) {
+      await transaction.contentItem.updateMany({
+        where: { type: 'NEWS', featured: true, id: { not: newsId }, archivedAt: null },
+        data: { featured: false },
+      });
+    }
+
+    const publishedAt = new Date();
+    const transition = await transaction.contentItem.updateMany({
+      where: {
+        id: newsId,
+        status: 'DRAFT',
+        lockVersion: existing.lockVersion,
+      },
+      data: {
+        status: 'PUBLISHED',
+        publishedAt,
+        scheduledAt: null,
+        archivedAt: null,
+        featured,
+        lockVersion: { increment: 1 },
+      },
+    });
+
+    if (transition.count !== 1) {
+      throw new AppError(
+        'La noticia fue modificada durante la publicación.',
+        409,
+        'NEWS_VERSION_CONFLICT',
+      );
+    }
+
+    const news = await transaction.contentItem.findUniqueOrThrow({
+      where: { id: newsId },
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        status: true,
+        featured: true,
+        publishedAt: true,
+        expiresAt: true,
+        lockVersion: true,
+      },
+    });
+
+    await transaction.auditLog.create({
+      data: {
+        actorId: actor.id,
+        action: 'NEWS_PUBLISHED',
+        entityType: 'ContentItem',
+        entityId: news.id,
+        before: {
+          status: existing.status,
+          featured: existing.featured,
+          publishedAt: existing.publishedAt?.toISOString() ?? null,
+          lockVersion: existing.lockVersion,
+        },
+        after: {
+          status: news.status,
+          featured: news.featured,
+          publishedAt: news.publishedAt?.toISOString() ?? null,
+          lockVersion: news.lockVersion,
+        },
+      },
+    });
+
+    return {
+      ...news,
+      publishedAt: news.publishedAt?.toISOString() ?? null,
+      expiresAt: news.expiresAt?.toISOString() ?? null,
+    };
+  });
+}
+
+export async function unpublishNews(actor: NewsActor, newsId: string, input: UnpublishNewsInput) {
+  const prisma = getPrismaClient();
+
+  return prisma.$transaction(async (transaction) => {
+    const accessCondition =
+      actor.role === 'ADMIN'
+        ? {}
+        : {
+            OR: [{ createdById: actor.id }, { assignedEditorId: actor.id }],
+          };
+
+    const existing = await transaction.contentItem.findFirst({
+      where: {
+        AND: [{ id: newsId }, { type: 'NEWS' }, accessCondition],
+      },
+      select: {
+        id: true,
+        status: true,
+        featured: true,
+        lockVersion: true,
+        publishedAt: true,
+      },
+    });
+
+    if (!existing) {
+      throw new AppError('No se encontró la noticia solicitada.', 404, 'NEWS_NOT_FOUND');
+    }
+
+    if (existing.lockVersion !== input.lockVersion) {
+      throw new AppError(
+        'La noticia fue modificada por otro usuario. Actualiza la página antes de despublicarla.',
+        409,
+        'NEWS_VERSION_CONFLICT',
+      );
+    }
+
+    if (existing.status !== 'PUBLISHED') {
+      throw new AppError(
+        'Solo pueden despublicarse noticias publicadas.',
+        409,
+        'NEWS_NOT_PUBLISHED',
+      );
+    }
+
+    const transition = await transaction.contentItem.updateMany({
+      where: {
+        id: newsId,
+        status: 'PUBLISHED',
+        lockVersion: input.lockVersion,
+      },
+      data: {
+        status: 'DRAFT',
+        featured: false,
+        publishedAt: null,
+        scheduledAt: null,
+        lockVersion: { increment: 1 },
+      },
+    });
+
+    if (transition.count !== 1) {
+      throw new AppError(
+        'La noticia fue modificada durante la despublicación.',
+        409,
+        'NEWS_VERSION_CONFLICT',
+      );
+    }
+
+    const news = await transaction.contentItem.findUniqueOrThrow({
+      where: { id: newsId },
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        status: true,
+        featured: true,
+        publishedAt: true,
+        expiresAt: true,
+        lockVersion: true,
+      },
+    });
+
+    await transaction.auditLog.create({
+      data: {
+        actorId: actor.id,
+        action: 'NEWS_UNPUBLISHED',
+        entityType: 'ContentItem',
+        entityId: news.id,
+        before: {
+          status: existing.status,
+          featured: existing.featured,
+          publishedAt: existing.publishedAt?.toISOString() ?? null,
+          lockVersion: existing.lockVersion,
+        },
+        after: {
+          status: news.status,
+          featured: news.featured,
+          publishedAt: null,
+          lockVersion: news.lockVersion,
+        },
+      },
+    });
+
+    return {
+      ...news,
+      publishedAt: null,
+      expiresAt: news.expiresAt?.toISOString() ?? null,
+    };
+  });
+}
+
+export async function setNewsFeatured(
+  actor: NewsActor,
+  newsId: string,
+  input: SetNewsFeaturedInput,
+) {
+  const prisma = getPrismaClient();
+
+  return prisma.$transaction(async (transaction) => {
+    const accessCondition =
+      actor.role === 'ADMIN'
+        ? {}
+        : {
+            OR: [{ createdById: actor.id }, { assignedEditorId: actor.id }],
+          };
+    const existing = await transaction.contentItem.findFirst({
+      where: { AND: [{ id: newsId }, { type: 'NEWS' }, accessCondition] },
+      select: { id: true, status: true, featured: true, archivedAt: true },
+    });
+
+    if (!existing) {
+      throw new AppError('No se encontró la noticia solicitada.', 404, 'NEWS_NOT_FOUND');
+    }
+
+    if (input.featured && existing.status !== 'PUBLISHED') {
+      throw new AppError(
+        'Solo una noticia publicada puede marcarse como destacada.',
+        409,
+        'NEWS_FEATURED_REQUIRES_PUBLISHED',
+      );
+    }
+
+    if (input.featured) {
+      await transaction.contentItem.updateMany({
+        where: { type: 'NEWS', featured: true, id: { not: newsId }, archivedAt: null },
+        data: { featured: false },
+      });
+    }
+
+    const news = await transaction.contentItem.update({
+      where: { id: newsId },
+      data: {
+        featured: input.featured,
+        lockVersion: { increment: 1 },
+      },
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        status: true,
+        featured: true,
+        lockVersion: true,
+      },
+    });
+
+    await transaction.auditLog.create({
+      data: {
+        actorId: actor.id,
+        action: input.featured ? 'NEWS_FEATURED' : 'NEWS_UNFEATURED',
+        entityType: 'ContentItem',
+        entityId: news.id,
+        before: existing,
+        after: news,
+      },
+    });
+
+    return news;
   });
 }
 
@@ -1614,6 +1819,7 @@ export async function listNewsRevisions(actor: NewsActor, newsId: string) {
       snapshot: true,
       changeSummary: true,
       publishedAt: true,
+      expiresAt: true,
       createdAt: true,
       updatedAt: true,
 

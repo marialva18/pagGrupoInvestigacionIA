@@ -7,6 +7,7 @@ import {
   listNewsRevisionsHandler,
   publishNewsHandler,
   restoreNewsHandler,
+  setNewsFeaturedHandler,
   unpublishNewsHandler,
   updateNewsHandler,
 } from './news.controller.js';
@@ -21,5 +22,6 @@ newsRouter.post('/', createNewsHandler);
 newsRouter.post('/:newsId/restore', restoreNewsHandler);
 newsRouter.post('/:newsId/publish', publishNewsHandler);
 newsRouter.post('/:newsId/unpublish', unpublishNewsHandler);
+newsRouter.patch('/:newsId/featured', setNewsFeaturedHandler);
 newsRouter.patch('/:newsId', updateNewsHandler);
 newsRouter.delete('/:newsId', archiveNewsHandler);

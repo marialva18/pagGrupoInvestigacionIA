@@ -1,0 +1,150 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import EditorialSession from '../../islands/EditorialSession';
+import '../../styles/editorial.css';
+
+interface Props {
+  title: string;
+  description?: string;
+  activeSection:
+    'dashboard' | 'publications' | 'discovery' | 'sources' | 'users' | 'members' | 'media';
+}
+
+const { title, description, activeSection } = Astro.props;
+
+interface NavItem {
+  key: Props['activeSection'];
+  label: string;
+  href: string;
+  icon: string;
+  adminOnly?: boolean;
+}
+
+const navItems: readonly NavItem[] = [
+  { key: 'dashboard', label: 'Resumen', href: '/editor', icon: 'grid' },
+  { key: 'publications', label: 'Publicaciones', href: '/editor/publicaciones', icon: 'document' },
+  { key: 'discovery', label: 'Descubrimiento', href: '/editor/descubrimiento', icon: 'search' },
+  { key: 'sources', label: 'Fuentes', href: '/editor/fuentes-noticias', icon: 'globe' },
+  { key: 'users', label: 'Usuarios', href: '/admin/usuarios', icon: 'users', adminOnly: true },
+] as const;
+---
+
+<BaseLayout title={`${title} | Panel INTGARTI`} description={description}>
+  <div class="editorial-shell" data-editorial-shell data-active-section={activeSection}>
+    <aside class="editorial-sidebar" id="editorial-sidebar">
+      <div class="editorial-sidebar__brand">
+        <a href="/editor" aria-label="Ir al resumen editorial">
+          <span class="editorial-brand-mark" aria-hidden="true">I</span>
+          <span>
+            <strong>INTGARTI</strong>
+            <small>Gestión editorial</small>
+          </span>
+        </a>
+        <button
+          class="editorial-sidebar__close"
+          type="button"
+          data-sidebar-close
+          aria-label="Cerrar menú">×</button
+        >
+      </div>
+
+      <nav class="editorial-nav" aria-label="Módulos del panel">
+        <p class="editorial-nav__label">Panel</p>
+        {
+          navItems.slice(0, 1).map((item) => (
+            <a
+              class:list={['editorial-nav__item', { 'is-active': activeSection === item.key }]}
+              href={item.href}
+              aria-current={activeSection === item.key ? 'page' : undefined}
+            >
+              <span class={`editorial-nav__icon icon-${item.icon}`} aria-hidden="true" />
+              <span>{item.label}</span>
+            </a>
+          ))
+        }
+
+        <p class="editorial-nav__label">Noticias</p>
+        {
+          navItems.slice(1, 4).map((item) => (
+            <a
+              class:list={['editorial-nav__item', { 'is-active': activeSection === item.key }]}
+              href={item.href}
+              aria-current={activeSection === item.key ? 'page' : undefined}
+            >
+              <span class={`editorial-nav__icon icon-${item.icon}`} aria-hidden="true" />
+              <span>{item.label}</span>
+            </a>
+          ))
+        }
+
+        <p class="editorial-nav__label">Administración</p>
+        {
+          navItems.slice(4).map((item) => (
+            <a
+              class:list={['editorial-nav__item', { 'is-active': activeSection === item.key }]}
+              href={item.href}
+              aria-current={activeSection === item.key ? 'page' : undefined}
+              data-admin-only={item.adminOnly ? '' : undefined}
+            >
+              <span class={`editorial-nav__icon icon-${item.icon}`} aria-hidden="true" />
+              <span>{item.label}</span>
+            </a>
+          ))
+        }
+      </nav>
+
+      <div class="editorial-sidebar__footer">
+        <a href="/">
+          <span class="editorial-nav__icon icon-external" aria-hidden="true"></span>
+          Salir al sitio público
+        </a>
+      </div>
+    </aside>
+
+    <div class="editorial-overlay" data-sidebar-close></div>
+
+    <main class="editorial-main">
+      <header class="editorial-topbar">
+        <div class="editorial-topbar__title">
+          <button
+            class="editorial-menu-button"
+            type="button"
+            data-sidebar-open
+            aria-label="Abrir menú"
+          >
+            <span></span><span></span><span></span>
+          </button>
+          <div>
+            <h1>{title}</h1>
+            {description && <p>{description}</p>}
+          </div>
+        </div>
+        <EditorialSession client:load />
+      </header>
+
+      <section class="editorial-content">
+        <slot />
+      </section>
+    </main>
+  </div>
+
+  <script is:inline>
+    const shell = document.querySelector('[data-editorial-shell]');
+    const cachedRole = window.localStorage.getItem('intgarti.editor.role');
+    const isUsersPage = shell?.getAttribute('data-active-section') === 'users';
+    document.querySelectorAll('[data-admin-only]').forEach((element) => {
+      element.hidden = cachedRole !== 'ADMIN' && !isUsersPage;
+    });
+    const openButton = document.querySelector('[data-sidebar-open]');
+    const closeButtons = document.querySelectorAll('[data-sidebar-close]');
+
+    const openSidebar = () => shell?.classList.add('sidebar-open');
+    const closeSidebar = () => shell?.classList.remove('sidebar-open');
+
+    openButton?.addEventListener('click', openSidebar);
+    closeButtons.forEach((button) => button.addEventListener('click', closeSidebar));
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeSidebar();
+    });
+  </script>
+</BaseLayout>

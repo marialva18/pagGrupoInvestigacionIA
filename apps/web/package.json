@@ -24,7 +24,8 @@
     "react": "latest",
     "react-dom": "latest",
     "tailwindcss": "latest",
-    "zod": "latest"
+    "zod": "latest",
+    "@supabase/supabase-js": "^2.110.7"
   },
   "devDependencies": {
     "@astrojs/check": "latest",

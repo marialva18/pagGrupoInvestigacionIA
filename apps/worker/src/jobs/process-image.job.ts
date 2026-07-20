@@ -104,22 +104,6 @@ export async function processNextImage(): Promise<{
       env.IMAGE_MAX_PIXELS,
     );
 
-    const duplicate = await prisma.mediaAsset.findFirst({
-      where: {
-        checksumSha256: original.checksum,
-        id: {
-          not: mediaAsset.id,
-        },
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (duplicate) {
-      throw new Error(`La misma imagen ya está registrada como ${duplicate.id}.`);
-    }
-
     await prisma.mediaVariant.upsert({
       where: {
         mediaAssetId_kind: {

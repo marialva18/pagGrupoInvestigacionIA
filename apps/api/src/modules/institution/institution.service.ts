@@ -59,7 +59,7 @@ export async function updateInstitutionProfile(
   input: InstitutionProfileInput,
 ) {
   const prisma = getPrismaClient();
-  const result = await prisma.siteSetting.upsert({
+  await prisma.siteSetting.upsert({
     where: { key: KEY },
     update: { value: input, description: 'Contenido institucional público de INTGARTI' },
     create: { key: KEY, value: input, description: 'Contenido institucional público de INTGARTI' },

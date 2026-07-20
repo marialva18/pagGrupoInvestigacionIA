@@ -2,6 +2,10 @@ import type { AuthenticatedUser } from '@intgarti/contracts';
 import type { PublishNewsInput, RestoreNewsInput, UnpublishNewsInput } from './news.schema.js';
 import { getPrismaClient } from '@intgarti/database';
 import { AppError } from '../../common/errors/app-error.js';
+import {
+  normalizeStoredRichTextBody,
+  toDatabaseJsonObject,
+} from '../../common/content/rich-text-body.js';
 import type {
   ArchiveNewsInput,
   CreateNewsInput,
@@ -144,7 +148,7 @@ export async function createNews(actor: NewsActor, input: CreateNewsInput) {
         slug,
         title: input.title.trim(),
         summary: input.summary.trim(),
-        body: input.body,
+        body: toDatabaseJsonObject(input.body),
         seoTitle,
         metaDescription,
         featured: false,
@@ -565,6 +569,7 @@ export async function getNewsById(actor: NewsActor, newsId: string) {
 
   return {
     ...news,
+    body: normalizeStoredRichTextBody(news.body),
 
     categories: news.categories.map(({ category }) => category),
   };
@@ -764,10 +769,7 @@ export async function updateNews(actor: NewsActor, newsId: string, input: Update
         slug: existing.slug,
         title: existing.title,
         summary: existing.summary ?? '',
-        body: (existing.body as NonNullable<UpdateNewsInput['body']> | null) ?? {
-          version: 1,
-          blocks: [],
-        },
+        body: normalizeStoredRichTextBody(existing.body),
         seoTitle: existing.seoTitle,
         metaDescription: existing.metaDescription,
         featured: existing.featured,
@@ -809,7 +811,7 @@ export async function updateNews(actor: NewsActor, newsId: string, input: Update
           version: (latestRevision?.version ?? 0) + 1,
           status: 'SUPERSEDED',
           sourceLockVersion: existing.lockVersion,
-          snapshot: previousSnapshot,
+          snapshot: toDatabaseJsonObject(previousSnapshot),
           changeSummary:
             input.changeSummary?.trim() ??
             'Versión anterior guardada automáticamente antes de editar la publicación.',
@@ -864,7 +866,7 @@ export async function updateNews(actor: NewsActor, newsId: string, input: Update
 
         ...(input.body !== undefined
           ? {
-              body: input.body,
+              body: toDatabaseJsonObject(input.body),
             }
           : {}),
 
@@ -1072,6 +1074,7 @@ export async function updateNews(actor: NewsActor, newsId: string, input: Update
 
       historyRevision,
       ...updated,
+      body: normalizeStoredRichTextBody(updated.body),
 
       categories: updated.categories.map(({ category }) => category),
     };

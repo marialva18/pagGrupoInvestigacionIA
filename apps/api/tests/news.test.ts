@@ -5,6 +5,7 @@ import test from 'node:test';
 import { createApp } from '../src/app.ts';
 import { authenticatedFetch, testAuthenticateAccessToken } from './helpers/test-auth.ts';
 import { createNewsSchema, updateNewsSchema } from '../src/modules/news/news.schema.ts';
+import { normalizeStoredRichTextBody } from '../src/common/content/rich-text-body.ts';
 
 const app = createApp({
   authenticateAccessToken: testAuthenticateAccessToken,
@@ -334,4 +335,86 @@ test('rejects an unpublish request without lock version', async () => {
 
     assert.equal(body.error.code, 'NEWS_UNPUBLISH_INVALID_INPUT');
   });
+});
+
+test('accepts a canonical TipTap news body', () => {
+  const result = createNewsSchema.safeParse({
+    title: 'Noticia con contenido estructurado',
+    summary: 'Resumen suficientemente extenso para validar una noticia con cuerpo TipTap.',
+    body: {
+      schemaVersion: 1,
+      editor: 'tiptap',
+      document: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Contenido público de la noticia.',
+              },
+            ],
+          },
+        ],
+      },
+    },
+    categoryIds: ['00000000-0000-4000-8000-000000000002'],
+  });
+
+  assert.equal(result.success, true);
+
+  if (!result.success) {
+    return;
+  }
+
+  assert.equal(result.data.body.editor, 'tiptap');
+  assert.equal(result.data.body.document.type, 'doc');
+});
+
+test('normalizes the legacy news body into TipTap', () => {
+  const body = normalizeStoredRichTextBody({
+    version: 1,
+    blocks: [
+      {
+        type: 'heading',
+        data: {
+          level: 2,
+          text: 'Título anterior',
+        },
+      },
+      {
+        type: 'paragraph',
+        data: {
+          text: 'Contenido anterior que debe seguir apareciendo públicamente.',
+        },
+      },
+    ],
+  });
+
+  assert.equal(body.schemaVersion, 1);
+  assert.equal(body.editor, 'tiptap');
+  assert.equal(body.document.content.length, 2);
+
+  const heading = body.document.content[0] as {
+    type?: string;
+    content?: Array<{
+      text?: string;
+    }>;
+  };
+
+  const paragraph = body.document.content[1] as {
+    type?: string;
+    content?: Array<{
+      text?: string;
+    }>;
+  };
+
+  assert.equal(heading.type, 'heading');
+  assert.equal(heading.content?.[0]?.text, 'Título anterior');
+  assert.equal(paragraph.type, 'paragraph');
+  assert.equal(
+    paragraph.content?.[0]?.text,
+    'Contenido anterior que debe seguir apareciendo públicamente.',
+  );
 });

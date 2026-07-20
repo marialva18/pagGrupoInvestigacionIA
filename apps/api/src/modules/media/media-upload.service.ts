@@ -263,3 +263,28 @@ export async function completeMediaUpload(actor: MediaActor, mediaAssetId: strin
     alreadyCompleted: false,
   };
 }
+
+export async function getMediaUploadStatus(actor: MediaActor, mediaAssetId: string) {
+  const prisma = getPrismaClient();
+  const mediaAsset = await prisma.mediaAsset.findFirst({
+    where: {
+      id: mediaAssetId,
+      createdById: actor.id,
+    },
+    select: {
+      id: true,
+      status: true,
+      errorMessage: true,
+    },
+  });
+
+  if (!mediaAsset) {
+    throw new AppError('No se encontró la imagen solicitada.', 404, 'MEDIA_ASSET_NOT_FOUND');
+  }
+
+  return {
+    mediaAssetId: mediaAsset.id,
+    status: mediaAsset.status,
+    errorMessage: mediaAsset.errorMessage,
+  };
+}

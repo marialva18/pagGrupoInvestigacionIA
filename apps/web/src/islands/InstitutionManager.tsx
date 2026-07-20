@@ -202,7 +202,7 @@ export default function InstitutionManager() {
         />
       </label>
       <label className="photo">
-        Fotografía principal
+        Portada del homepage
         <input
           type="file"
           accept="image/jpeg,image/png,image/webp"
@@ -213,7 +213,7 @@ export default function InstitutionManager() {
           value={form.heroMediaId ?? ''}
           onChange={(e) => field('heroMediaId', e.target.value || null)}
         >
-          <option value="">Sin fotografía principal</option>
+          <option value="">Sin portada del homepage</option>
           {mediaLibrary.map((media) => (
             <option value={media.id}>{media.originalFilename}</option>
           ))}
@@ -221,12 +221,12 @@ export default function InstitutionManager() {
         {form.heroMediaId && mediaLibrary.find((media) => media.id === form.heroMediaId) && (
           <img
             src={mediaLibrary.find((media) => media.id === form.heroMediaId)?.url}
-            alt="Vista previa de la fotografía principal"
+            alt="Vista previa de la portada del homepage"
           />
         )}
       </label>
       <label className="photo">
-        Fotografía del grupo
+        Fotografía de la página El grupo
         <input
           type="file"
           accept="image/jpeg,image/png,image/webp"
@@ -237,7 +237,7 @@ export default function InstitutionManager() {
           value={form.groupMediaId ?? ''}
           onChange={(e) => field('groupMediaId', e.target.value || null)}
         >
-          <option value="">Sin fotografía del grupo</option>
+          <option value="">Sin fotografía para la página El grupo</option>
           {mediaLibrary.map((media) => (
             <option value={media.id}>{media.originalFilename}</option>
           ))}

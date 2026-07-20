@@ -1,0 +1,12 @@
+---
+import EditorialLayout from '../../../components/editorial/EditorialLayout.astro';
+import InstitutionManager from '../../../islands/InstitutionManager';
+---
+
+<EditorialLayout
+  title="Grupo"
+  description="Edita la presentación, proyectos y fotografías públicas de INTGARTI."
+  activeSection="institution"
+>
+  <InstitutionManager client:load />
+</EditorialLayout>

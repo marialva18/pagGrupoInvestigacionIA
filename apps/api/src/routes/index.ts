@@ -17,6 +17,8 @@ import { mediaRouter } from '../modules/media/media.routes.js';
 import { membersRouter } from '../modules/members/members.routes.js';
 import { newsRouter } from '../modules/news/news.routes.js';
 import { publicContentRouter } from '../modules/public-content/public-content.routes.js';
+import { institutionRouter } from '../modules/institution/institution.routes.js';
+import { getInstitutionHandler } from '../modules/institution/institution.controller.js';
 
 export interface ApiV1RouterOptions {
   enableEditorRoutes?: boolean;
@@ -33,6 +35,7 @@ export function createApiV1Router(options: ApiV1RouterOptions = {}): Router {
   router.use('/health', healthRouter);
   router.use('/auth', createAuthRouter(authenticate));
   router.use('/public', publicContentRouter);
+  router.get('/public/institution', getInstitutionHandler);
 
   if (enableEditorRoutes) {
     const requireAuthentication = createRequireAuthenticatedUser(authenticate);
@@ -50,6 +53,7 @@ export function createApiV1Router(options: ApiV1RouterOptions = {}): Router {
     router.use('/editor/media', requireAuthentication, requireEditor, mediaRouter);
     router.use('/editor/members', requireAuthentication, requireEditor, membersRouter);
     router.use('/editor/news', requireAuthentication, requireEditor, newsRouter);
+    router.use('/editor/institution', requireAuthentication, requireEditor, institutionRouter);
   }
 
   return router;

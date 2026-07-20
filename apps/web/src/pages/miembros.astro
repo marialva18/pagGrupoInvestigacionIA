@@ -1,51 +1,127 @@
 ---
+import { publicMemberSchema } from '@intgarti/contracts';
+import { z } from 'zod';
 import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/public/Header.astro';
+import Footer from '../components/public/Footer.astro';
+import { apiRequest } from '../lib/api-client';
+const members = await apiRequest('/public/members', z.array(publicMemberSchema)).catch(() => []);
 ---
 
-<BaseLayout title="Miembros | INTGARTI">
-  <main class="page">
-    <span>INTGARTI</span>
-    <h1>Miembros</h1>
-    <p>Directorio de investigadores y perfiles académicos.</p>
-    <a href="/">← Volver al inicio</a>
-  </main>
-</BaseLayout>
-
+<BaseLayout title="Miembros | INTGARTI"
+  ><Header /><main class="page">
+    <div class="container">
+      <span class="eyebrow">Equipo de investigación</span><h1>Miembros</h1><p class="lead">
+        Docentes, investigadores y estudiantes que integran INTGARTI.
+      </p><div class="grid">
+        {
+          members.map((member) => (
+            <article class:list={{ coordinator: member.isCoordinator }}>
+              {member.photoMedia ? (
+                <img
+                  src={member.photoMedia.url}
+                  alt={member.photoMedia.altText ?? member.fullName}
+                />
+              ) : (
+                <div class="avatar">{member.fullName.charAt(0)}</div>
+              )}
+              <div>
+                <strong>{member.roleTitle}</strong>
+                {member.biography && <p>{member.biography}</p>}
+                <nav>
+                  {member.email && <a href={`mailto:${member.email}`}>Correo</a>}
+                  {member.orcidUrl && (
+                    <a href={member.orcidUrl} target="_blank">
+                      ORCID
+                    </a>
+                  )}
+                  {member.linkedinUrl && (
+                    <a href={member.linkedinUrl} target="_blank">
+                      LinkedIn
+                    </a>
+                  )}
+                </nav>
+              </div>
+            </article>
+          ))
+        }
+      </div>{members.length === 0 && <p>No hay miembros publicados.</p>}
+    </div>
+  </main><Footer /></BaseLayout
+>
 <style>
   .page {
-    width: min(calc(100% - 40px), 900px);
-    margin-inline: auto;
     padding: 90px 0;
+    background: var(--color-ivory);
   }
-
-  span {
+  .eyebrow,
+  article small {
     color: var(--color-burgundy);
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
+    font-weight: 800;
+    text-transform: uppercase;
   }
-
-  h1 {
-    margin: 18px 0;
+  .page h1 {
+    margin: 12px 0;
     color: var(--color-navy);
     font-family: var(--font-heading);
     font-size: clamp(3rem, 7vw, 6rem);
-    font-weight: 500;
-    line-height: 0.95;
   }
-
-  p {
-    max-width: 680px;
-    color: var(--color-muted);
-    font-size: 1.08rem;
+  .lead {
+    margin-bottom: 45px;
   }
-
-  a {
-    display: inline-block;
-    margin-top: 28px;
-    padding-bottom: 3px;
-    border-bottom: 1px solid currentColor;
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+  .grid article {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    gap: 24px;
+    padding: 22px;
+    background: white;
+  }
+  .grid article.coordinator {
+    grid-column: 1/-1;
+  }
+  .grid img,
+  .avatar {
+    width: 150px;
+    height: 180px;
+    object-fit: cover;
+    background: var(--color-navy);
+    color: white;
+    display: grid;
+    place-items: center;
+    font-size: 3rem;
+  }
+  .grid h2 {
+    margin: 7px 0;
+    color: var(--color-navy);
+    font-family: var(--font-heading);
+  }
+  nav {
+    display: flex;
+    gap: 15px;
+    margin-top: 15px;
     color: var(--color-burgundy);
     font-weight: 700;
+  }
+  @media (max-width: 850px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+    .grid article.coordinator {
+      grid-column: auto;
+    }
+  }
+  @media (max-width: 520px) {
+    .grid article {
+      grid-template-columns: 1fr;
+    }
+    .grid img,
+    .avatar {
+      width: 100%;
+    }
   }
 </style>

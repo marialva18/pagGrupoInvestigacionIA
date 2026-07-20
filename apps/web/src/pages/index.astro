@@ -3,6 +3,13 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import Footer from '../components/public/Footer.astro';
 import Header from '../components/public/Header.astro';
 import { listPublicNews } from '../services/api/news.api';
+import {
+  institutionProfileSchema,
+  publicAcademicSourceSchema,
+  publicMemberSchema,
+} from '@intgarti/contracts';
+import { z } from 'zod';
+import { apiRequest } from '../lib/api-client';
 
 const newsResult = await listPublicNews({ pageSize: 4 }).catch(() => ({
   items: [],
@@ -43,7 +50,12 @@ function externalLinkAttributes(news: (typeof newsResult.items)[number]) {
     : {};
 }
 
-const sources = ['IEEE Xplore', 'ACM Digital Library', 'arXiv', 'Semantic Scholar'];
+const [sources, members, institution] = await Promise.all([
+  apiRequest('/public/academic-sources', z.array(publicAcademicSourceSchema)).catch(() => []),
+  apiRequest('/public/members', z.array(publicMemberSchema)).catch(() => []),
+  apiRequest('/public/institution', institutionProfileSchema).catch(() => null),
+]);
+const coordinator = members.find((member) => member.isCoordinator) ?? members[0] ?? null;
 ---
 
 <BaseLayout>
@@ -67,10 +79,19 @@ const sources = ['IEEE Xplore', 'ACM Digital Library', 'arXiv', 'Semantic Schola
         </div>
       </div>
 
-      <div class="hero-photo">
-        <strong>Fotografía institucional</strong>
-        <span>Se cargará desde Supabase Storage.</span>
-      </div>
+      {
+        institution?.heroMedia ? (
+          <img
+            class="hero-photo-image"
+            src={institution.heroMedia.url}
+            alt={institution.heroMedia.altText ?? 'INTGARTI'}
+          />
+        ) : (
+          <div class="hero-photo">
+            <strong>Fotografía institucional</strong>
+          </div>
+        )
+      }
     </section>
 
     <section class="section">
@@ -166,20 +187,20 @@ const sources = ['IEEE Xplore', 'ACM Digital Library', 'arXiv', 'Semantic Schola
       </div>
     </section>
 
-    <section class="section sources">
+    <section class="section sources" id="fuentes-academicas">
       <div class="container">
         <span class="label light">Explora investigación</span>
         <h2>Busca publicaciones en fuentes académicas.</h2>
-        <p>Las fuentes, descripciones y enlaces se administrarán desde la base de datos.</p>
+        <p>Fuentes seleccionadas para apoyar la búsqueda y producción científica.</p>
 
         <div class="source-grid">
           {
-            sources.map((source, index) => (
-              <article>
+            sources.slice(0, 4).map((source, index) => (
+              <a href={source.url} target="_blank" rel="noopener noreferrer">
                 <span>0{index + 1}</span>
-                <h3>{source}</h3>
-                <p>Fuente académica configurable desde el panel administrativo.</p>
-              </article>
+                <h3>{source.name}</h3>
+                <p>{source.description}</p>
+              </a>
             ))
           }
         </div>
@@ -193,10 +214,8 @@ const sources = ['IEEE Xplore', 'ACM Digital Library', 'arXiv', 'Semantic Schola
           <h2>Investigación organizada y aplicada.</h2>
         </div>
         <div class="lines">
-          <p>El contenido institucional procederá de la API y podrá editarse con permisos.</p>
-          <div>Ciberseguridad</div>
-          <div>Gobierno y Gestión de TIC</div>
-          <div>Sistemas Inteligentes</div>
+          <p>{institution?.objectives}</p>
+          {institution?.researchLines.map((line) => <div>{line.name}</div>)}
         </div>
       </div>
     </section>
@@ -207,51 +226,31 @@ const sources = ['IEEE Xplore', 'ACM Digital Library', 'arXiv', 'Semantic Schola
         <h2>Coordinación y equipo de investigación.</h2>
 
         <div class="member-layout">
-          <div class="member-photo">Fotografía del coordinador</div>
+          {
+            coordinator?.photoMedia ? (
+              <img
+                class="member-photo-image"
+                src={coordinator.photoMedia.url}
+                alt={coordinator.photoMedia.altText ?? coordinator.fullName}
+              />
+            ) : (
+              <div class="member-photo">Fotografía del coordinador</div>
+            )
+          }
           <div class="member-list">
             <article>
-              <strong>Coordinador de INTGARTI</strong>
-              <span>Perfil administrable desde la base de datos.</span>
+              <strong>{coordinator?.fullName ?? 'Coordinador de INTGARTI'}</strong>
+              <span>{coordinator?.roleTitle ?? 'Perfil institucional'}</span>
             </article>
             <article>
-              <strong>Miembros titulares</strong>
-              <span>Directorio, grados y enlaces académicos.</span>
+              <strong>{members.length} miembros publicados</strong>
+              <span><a href="/miembros">Consultar directorio completo →</a></span>
             </article>
             <article>
               <strong>Perfiles académicos</strong>
               <span>ORCID, Google Scholar y otros enlaces.</span>
             </article>
           </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="section ivory">
-      <div class="container">
-        <span class="label">Contacto</span>
-        <h2>Consultas y colaboración académica.</h2>
-
-        <div class="contact-layout">
-          <form>
-            <label>
-              Nombre
-              <input type="text" disabled />
-            </label>
-            <label>
-              Correo
-              <input type="email" disabled />
-            </label>
-            <label class="full">
-              Mensaje
-              <textarea rows="5" disabled></textarea>
-            </label>
-            <button class="button primary" type="button" disabled>Enviar consulta</button>
-          </form>
-
-          <aside>
-            <h3>Información institucional</h3>
-            <p>El correo, teléfono, oficina y ubicación se cargarán desde configuración.</p>
-          </aside>
         </div>
       </div>
     </section>
@@ -354,6 +353,14 @@ const sources = ['IEEE Xplore', 'ACM Digital Library', 'arXiv', 'Semantic Schola
     flex-direction: column;
     color: rgb(255 255 255 / 75%);
     background: var(--color-navy-medium);
+  }
+
+  .hero-photo-image,
+  .member-photo-image {
+    width: 100%;
+    height: 100%;
+    min-height: 500px;
+    object-fit: cover;
   }
 
   .hero-photo span {
@@ -513,7 +520,8 @@ const sources = ['IEEE Xplore', 'ACM Digital Library', 'arXiv', 'Semantic Schola
     margin-top: 46px;
   }
 
-  .source-grid article {
+  .source-grid article,
+  .source-grid > a {
     display: flex;
     min-height: 340px;
     flex-direction: column;
@@ -522,16 +530,19 @@ const sources = ['IEEE Xplore', 'ACM Digital Library', 'arXiv', 'Semantic Schola
     background: var(--color-navy-medium);
   }
 
-  .source-grid article:first-child {
+  .source-grid article:first-child,
+  .source-grid > a:first-child {
     background: var(--color-burgundy);
   }
 
-  .source-grid article:nth-child(3) {
+  .source-grid article:nth-child(3),
+  .source-grid > a:nth-child(3) {
     color: var(--color-text);
     background: var(--color-ivory);
   }
 
-  .source-grid article > span {
+  .source-grid article > span,
+  .source-grid > a > span {
     margin-bottom: auto;
     font-size: 0.72rem;
     font-weight: 700;
@@ -599,62 +610,11 @@ const sources = ['IEEE Xplore', 'ACM Digital Library', 'arXiv', 'Semantic Schola
     color: var(--color-muted);
   }
 
-  .contact-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1.1fr) minmax(350px, 0.9fr);
-    gap: 68px;
-    margin-top: 46px;
-  }
-
-  form {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 24px;
-  }
-
-  label {
-    display: grid;
-    gap: 7px;
-    color: var(--color-navy);
-    font-size: 0.8rem;
-    font-weight: 700;
-  }
-
-  input,
-  textarea {
-    width: 100%;
-    padding: 11px 0;
-    border: 0;
-    border-bottom: 1px solid #aaa59d;
-    border-radius: 0;
-    background: transparent;
-  }
-
-  .full {
-    grid-column: 1 / -1;
-  }
-
-  form button {
-    width: max-content;
-  }
-
-  aside {
-    padding: 38px;
-    color: rgb(255 255 255 / 72%);
-    background: var(--color-navy);
-  }
-
-  aside h3 {
-    color: var(--color-white);
-    font-size: 2rem;
-  }
-
   @media (max-width: 900px) {
     .hero,
     .news-layout,
     .split,
-    .member-layout,
-    .contact-layout {
+    .member-layout {
       grid-template-columns: 1fr;
     }
 
@@ -695,13 +655,8 @@ const sources = ['IEEE Xplore', 'ACM Digital Library', 'arXiv', 'Semantic Schola
       margin-left: 0;
     }
 
-    .source-grid,
-    form {
+    .source-grid {
       grid-template-columns: 1fr;
-    }
-
-    .full {
-      grid-column: auto;
     }
   }
 </style>

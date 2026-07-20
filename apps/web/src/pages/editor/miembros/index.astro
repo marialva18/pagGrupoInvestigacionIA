@@ -1,0 +1,10 @@
+---
+import EditorialLayout from '../../../components/editorial/EditorialLayout.astro';
+import MemberManager from '../../../islands/MemberManager';
+---
+
+<EditorialLayout
+  title="Miembros"
+  description="Administra el directorio, perfiles y fotografías."
+  activeSection="members"><MemberManager client:load /></EditorialLayout
+>

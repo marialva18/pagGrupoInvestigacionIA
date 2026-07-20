@@ -1,51 +1,163 @@
 ---
+import { institutionProfileSchema } from '@intgarti/contracts';
 import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/public/Header.astro';
+import Footer from '../components/public/Footer.astro';
+import { apiRequest } from '../lib/api-client';
+const profile = await apiRequest('/public/institution', institutionProfileSchema).catch(() => null);
 ---
 
-<BaseLayout title="El grupo | INTGARTI">
-  <main class="page">
-    <span>INTGARTI</span>
-    <h1>El grupo</h1>
-    <p>Información institucional, objetivos y líneas de investigación.</p>
-    <a href="/">← Volver al inicio</a>
-  </main>
-</BaseLayout>
-
+<BaseLayout title="El grupo | INTGARTI"
+  ><Header /><main>
+    <section class="hero">
+      <div>
+        <span>INTGARTI · UNMSM</span><h1>Investigación en inteligencia artificial</h1><p>
+          {profile?.introduction}
+        </p>
+      </div>{
+        profile?.heroMedia ? (
+          <img src={profile.heroMedia.url} alt={profile.heroMedia.altText ?? 'Grupo INTGARTI'} />
+        ) : (
+          <div class="photo">Fotografía institucional</div>
+        )
+      }
+    </section><section class="section">
+      <div class="container columns">
+        <article>
+          <span>Objetivos</span><h2>Investigación organizada y aplicada.</h2><p>
+            {profile?.objectives}
+          </p>
+        </article><article>
+          <span>Servicios</span><ul>{profile?.services.map((service) => <li>{service}</li>)}</ul>
+        </article>
+      </div>
+    </section><section class="section dark">
+      <div class="container">
+        <span>Líneas de investigación</span><div class="cards">
+          {
+            profile?.researchLines.map((line) => (
+              <article>
+                <>
+                  <small>{line.code}</small>
+                  <h3>{line.name}</h3>
+                </>
+              </article>
+            ))
+          }
+        </div>
+      </div>
+    </section><section class="section">
+      <div class="container">
+        <span>Proyectos</span><h2>Investigación desarrollada por el grupo.</h2><div
+          class="projects"
+        >
+          {
+            profile?.projects.length ? (
+              profile.projects.map((project) => (
+                <article>
+                  <>
+                    <small>{project.code}</small>
+                    <h3>{project.title}</h3>
+                  </>
+                </article>
+              ))
+            ) : (
+              <p>Los proyectos serán publicados próximamente.</p>
+            )
+          }
+        </div>
+      </div>
+    </section>
+  </main><Footer /></BaseLayout
+>
 <style>
-  .page {
-    width: min(calc(100% - 40px), 900px);
-    margin-inline: auto;
-    padding: 90px 0;
+  .hero {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: 580px;
+    background: var(--color-ivory);
   }
-
-  span {
+  .hero > div:first-child {
+    padding: 90px max(24px, calc((100vw - var(--content-width)) / 2));
+  }
+  .hero span,
+  .section > div > span,
+  .columns article > span {
     color: var(--color-burgundy);
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
+    font-weight: 800;
+    text-transform: uppercase;
   }
-
-  h1 {
-    margin: 18px 0;
+  .hero h1,
+  h2 {
     color: var(--color-navy);
     font-family: var(--font-heading);
-    font-size: clamp(3rem, 7vw, 6rem);
-    font-weight: 500;
-    line-height: 0.95;
+    font-size: clamp(2.8rem, 5vw, 5.5rem);
+    line-height: 1;
   }
-
-  p {
-    max-width: 680px;
-    color: var(--color-muted);
-    font-size: 1.08rem;
+  .hero img,
+  .photo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: var(--color-navy);
+    color: white;
+    display: grid;
+    place-items: center;
   }
-
-  a {
-    display: inline-block;
-    margin-top: 28px;
-    padding-bottom: 3px;
-    border-bottom: 1px solid currentColor;
-    color: var(--color-burgundy);
-    font-weight: 700;
+  .section {
+    padding: 90px 0;
+  }
+  .columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 70px;
+  }
+  .columns p {
+    white-space: pre-line;
+  }
+  .columns li,
+  .projects article {
+    padding: 18px 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+  .dark {
+    color: white;
+    background: var(--color-navy);
+  }
+  .dark span {
+    color: #d9bb83 !important;
+  }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 35px;
+  }
+  .cards article {
+    padding: 30px;
+    background: #ffffff10;
+  }
+  .cards h3 {
+    font-family: var(--font-heading);
+    font-size: 1.7rem;
+  }
+  .projects {
+    margin-top: 30px;
+  }
+  .projects h3 {
+    color: var(--color-navy);
+  }
+  @media (max-width: 800px) {
+    .hero,
+    .columns {
+      grid-template-columns: 1fr;
+    }
+    .hero img,
+    .photo {
+      min-height: 350px;
+    }
+    .cards {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

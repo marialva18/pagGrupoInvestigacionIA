@@ -18,6 +18,6 @@ Dejar una base común, ejecutable, segura y documentada antes de repartir módul
 - Modelo Prisma definitivo.
 - Autenticación real.
 - Editor completo.
-- Integración efectiva con Mailjet.
+- Envío de autenticación mediante Brevo SMTP en Supabase.
 - Integración efectiva con Supabase.
 - Ingesta de noticias.

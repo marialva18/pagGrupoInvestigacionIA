@@ -2,7 +2,7 @@
 
 Procesos que no deben bloquear la API:
 
-- Mailjet.
+- Procesamiento asíncrono de contenido e imágenes.
 - Procesamiento de imágenes.
 - Publicaciones programadas.
 - Agregación de analítica.

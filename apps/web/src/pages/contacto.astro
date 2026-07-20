@@ -1,51 +1,105 @@
 ---
+import { institutionProfileSchema } from '@intgarti/contracts';
 import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/public/Header.astro';
+import Footer from '../components/public/Footer.astro';
+import { apiRequest } from '../lib/api-client';
+
+const profile = await apiRequest('/public/institution', institutionProfileSchema).catch(() => null);
+const contactEmail = 'dmauricios@unmsm.edu.pe';
+const mailSubject = encodeURIComponent('Consulta desde el portal INTGARTI');
 ---
 
 <BaseLayout title="Contacto | INTGARTI">
-  <main class="page">
-    <span>INTGARTI</span>
-    <h1>Contacto</h1>
-    <p>Formulario independiente y datos institucionales.</p>
-    <a href="/">← Volver al inicio</a>
+  <Header />
+  <main class="contact-page">
+    <div class="container contact-grid">
+      <section>
+        <span class="eyebrow">Comunícate con nosotros</span>
+        <h1>Contacto</h1>
+        <p class="lead">
+          Para consultas académicas, colaboración o información sobre el grupo, escríbenos por
+          correo electrónico.
+        </p>
+        <a class="contact-button" href={`mailto:${contactEmail}?subject=${mailSubject}`}>
+          Escribir a {contactEmail}
+        </a>
+      </section>
+      <aside>
+        <h2>Información institucional</h2>
+        <dl>
+          <div><dt>Correo</dt><dd><a href={`mailto:${contactEmail}`}>{contactEmail}</a></dd></div>
+          <div><dt>Teléfono</dt><dd>{profile?.phone ?? '619 7000'}</dd></div>
+          <div><dt>Oficina</dt><dd>{profile?.office ?? 'Instituto de Investigación'}</dd></div>
+        </dl>
+      </aside>
+    </div>
   </main>
+  <Footer />
 </BaseLayout>
 
 <style>
-  .page {
-    width: min(calc(100% - 40px), 900px);
-    margin-inline: auto;
-    padding: 90px 0;
+  .contact-page {
+    min-height: 620px;
+    padding: 100px 0;
+    background: var(--color-ivory);
   }
-
-  span {
+  .contact-grid {
+    display: grid;
+    grid-template-columns: 1.25fr 0.75fr;
+    gap: 70px;
+  }
+  .eyebrow {
     color: var(--color-burgundy);
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
+    font-weight: 800;
+    text-transform: uppercase;
   }
-
   h1 {
-    margin: 18px 0;
+    margin: 14px 0 24px;
     color: var(--color-navy);
     font-family: var(--font-heading);
-    font-size: clamp(3rem, 7vw, 6rem);
-    font-weight: 500;
+    font-size: clamp(3.5rem, 7vw, 6.5rem);
     line-height: 0.95;
   }
-
-  p {
+  .lead {
     max-width: 680px;
     color: var(--color-muted);
-    font-size: 1.08rem;
+    font-size: 1.15rem;
   }
-
-  a {
-    display: inline-block;
-    margin-top: 28px;
-    padding-bottom: 3px;
-    border-bottom: 1px solid currentColor;
-    color: var(--color-burgundy);
-    font-weight: 700;
+  .contact-button {
+    display: inline-flex;
+    margin-top: 24px;
+    padding: 15px 22px;
+    color: white;
+    background: var(--color-burgundy);
+    font-weight: 800;
+  }
+  aside {
+    padding: 36px;
+    color: white;
+    background: var(--color-navy);
+  }
+  aside h2 {
+    margin-top: 0;
+    font-family: var(--font-heading);
+    font-size: 2rem;
+  }
+  dl div {
+    padding: 16px 0;
+    border-top: 1px solid rgb(255 255 255 / 18%);
+  }
+  dt {
+    color: rgb(255 255 255 / 58%);
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+  dd {
+    margin: 5px 0 0;
+  }
+  @media (max-width: 760px) {
+    .contact-grid {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

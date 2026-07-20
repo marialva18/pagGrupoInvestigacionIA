@@ -7,6 +7,7 @@ export * from './contact.js';
 export * from './content.js';
 export * from './external-news.js';
 export * from './importer.js';
+export * from './institution.js';
 export * from './media.js';
 export * from './members.js';
 export * from './news.js';

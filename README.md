@@ -28,7 +28,7 @@ Web → /api/v1 → API → Prisma → PostgreSQL
 - Express + TypeScript + Zod.
 - Prisma + PostgreSQL/Supabase.
 - Supabase Storage.
-- Mailjet.
+- Brevo SMTP mediante Supabase Authentication.
 - Worker Node.js.
 - pnpm workspace + Turborepo.
 - Docker Compose.
@@ -74,7 +74,7 @@ pnpm build
 Nunca subir:
 
 - `.env`
-- claves de Mailjet
+- credenciales de correo o Brevo
 - service role key de Supabase
 - contraseñas
 - secretos de sesión

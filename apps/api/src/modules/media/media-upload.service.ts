@@ -5,9 +5,29 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { getPrismaClient } from '@intgarti/database';
 import { AppError } from '../../common/errors/app-error.js';
 import { env } from '../../config/env.js';
+import { mapMediaReference, mediaReferenceSelect } from './media-reference.js';
 import type { CreateMediaUploadRequestInput } from './media-upload.schema.js';
 
 type MediaActor = Pick<AuthenticatedUser, 'id'>;
+
+export async function listMediaLibrary() {
+  const prisma = getPrismaClient();
+  const mediaAssets = await prisma.mediaAsset.findMany({
+    where: {
+      status: 'READY',
+      archivedAt: null,
+      rightsStatus: { not: 'RESTRICTED' },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+    select: mediaReferenceSelect,
+  });
+
+  return mediaAssets.flatMap((mediaAsset) => {
+    const mapped = mapMediaReference(mediaAsset);
+    return mapped ? [mapped] : [];
+  });
+}
 
 const extensionByMimeType = {
   'image/jpeg': 'jpg',

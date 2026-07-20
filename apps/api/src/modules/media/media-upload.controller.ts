@@ -9,7 +9,16 @@ import {
   completeMediaUpload,
   createMediaUploadRequest,
   getMediaUploadStatus,
+  listMediaLibrary,
 } from './media-upload.service.js';
+
+export const listMediaLibraryHandler: RequestHandler = (_request, response, next) => {
+  void listMediaLibrary()
+    .then((result) => {
+      response.status(200).json({ data: result });
+    })
+    .catch(next);
+};
 
 export const createMediaUploadRequestHandler: RequestHandler = (request, response, next) => {
   const parsed = createMediaUploadRequestSchema.safeParse(request.body);

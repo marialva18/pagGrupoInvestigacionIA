@@ -26,7 +26,9 @@
     "docker:down": "docker compose down",
     "docker:reset": "docker compose down -v --remove-orphans",
     "docker:logs": "docker compose logs -f",
-    "db:migrate": "pnpm --filter @intgarti/database prisma:migrate:dev",
+    "db:migrate": "pnpm --filter @intgarti/database prisma:migrate:deploy",
+    "db:migrate:dev": "pnpm --filter @intgarti/database prisma:migrate:dev",
+    "db:migrate:deploy": "pnpm --filter @intgarti/database prisma:migrate:deploy",
     "db:seed": "pnpm --filter @intgarti/database prisma:seed",
     "db:studio": "pnpm --filter @intgarti/database prisma:studio",
     "start:render": "node scripts/start-render.mjs"

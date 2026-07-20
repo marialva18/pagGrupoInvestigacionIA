@@ -1,0 +1,12 @@
+---
+import EditorialLayout from '../../../components/editorial/EditorialLayout.astro';
+import PublicationManager from '../../../islands/PublicationManager';
+---
+
+<EditorialLayout
+  title="Publicaciones"
+  description="Crea, edita, publica, archiva y configura la caducidad del contenido."
+  activeSection="publications"
+>
+  <PublicationManager client:load />
+</EditorialLayout>

@@ -1,0 +1,12 @@
+---
+import EditorialLayout from '../../../components/editorial/EditorialLayout.astro';
+import NewsDiscoveryManager from '../../../islands/NewsDiscoveryManager';
+---
+
+<EditorialLayout
+  title="Descubrimiento"
+  description="Busca y revisa publicaciones obtenidas desde fuentes autorizadas."
+  activeSection="discovery"
+>
+  <NewsDiscoveryManager client:load />
+</EditorialLayout>

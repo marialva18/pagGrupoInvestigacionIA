@@ -1,0 +1,12 @@
+---
+import EditorialLayout from '../../../components/editorial/EditorialLayout.astro';
+import NewsSourcesManager from '../../../islands/NewsSourcesManager';
+---
+
+<EditorialLayout
+  title="Fuentes"
+  description="Configura dominios confiables, frecuencia, filtros y método de detección."
+  activeSection="sources"
+>
+  <NewsSourcesManager client:load />
+</EditorialLayout>

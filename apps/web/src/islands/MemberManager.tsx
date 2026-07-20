@@ -17,6 +17,11 @@ const completedUploadSchema = z
     alreadyCompleted: z.boolean(),
   })
   .passthrough();
+const uploadStatusSchema = z.object({
+  mediaAssetId: z.string().uuid(),
+  status: z.enum(['PENDING', 'UPLOADING', 'PROCESSING', 'READY', 'REJECTED', 'ARCHIVED']),
+  errorMessage: z.string().nullable(),
+});
 
 const wait = (milliseconds: number) =>
   new Promise<void>((resolve) => {
@@ -99,7 +104,7 @@ export default function MemberManager() {
         body: file,
       });
       if (!put.ok) throw new Error('No fue posible subir la foto.');
-      let completed = await apiRequest(
+      const completed = await apiRequest(
         `/editor/media/${u.mediaAssetId}/complete`,
         completedUploadSchema,
         {
@@ -108,21 +113,32 @@ export default function MemberManager() {
         },
       );
 
-      for (let attempt = 0; completed.status !== 'READY' && attempt < 20; attempt += 1) {
+      let status: z.infer<typeof uploadStatusSchema>['status'] = completed.status;
+
+      for (let attempt = 0; status !== 'READY' && attempt < 20; attempt += 1) {
         setMessage('Procesando fotografía…');
         await wait(1500);
 
-        completed = await apiRequest(
-          `/editor/media/${u.mediaAssetId}/complete`,
-          completedUploadSchema,
-          {
-            method: 'POST',
-            accessToken: t,
-          },
+        const current = await apiRequest(
+          `/editor/media/${u.mediaAssetId}/status`,
+          uploadStatusSchema,
+          { accessToken: t },
         );
+
+        if (current.status === 'REJECTED') {
+          throw new Error(
+            current.errorMessage ?? 'La fotografía fue rechazada durante el proceso.',
+          );
+        }
+
+        if (current.status === 'ARCHIVED') {
+          throw new Error('La fotografía dejó de estar disponible durante el proceso.');
+        }
+
+        status = current.status;
       }
 
-      if (completed.status !== 'READY') {
+      if (status !== 'READY') {
         throw new Error(
           'La fotografía todavía se está procesando. Espera unos segundos y vuelve a seleccionarla.',
         );

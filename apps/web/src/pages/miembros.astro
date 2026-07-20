@@ -26,7 +26,8 @@ const members = await apiRequest('/public/members', z.array(publicMemberSchema))
                 <div class="avatar">{member.fullName.charAt(0)}</div>
               )}
               <div>
-                <strong>{member.roleTitle}</strong>
+                <h2>{member.fullName}</h2>
+                <small>{member.roleTitle}</small>
                 {member.biography && <p>{member.biography}</p>}
                 <nav>
                   {member.email && <a href={`mailto:${member.email}`}>Correo</a>}

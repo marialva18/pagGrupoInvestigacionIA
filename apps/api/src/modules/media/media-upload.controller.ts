@@ -5,7 +5,11 @@ import {
   completeMediaUploadParamsSchema,
   createMediaUploadRequestSchema,
 } from './media-upload.schema.js';
-import { completeMediaUpload, createMediaUploadRequest } from './media-upload.service.js';
+import {
+  completeMediaUpload,
+  createMediaUploadRequest,
+  getMediaUploadStatus,
+} from './media-upload.service.js';
 
 export const createMediaUploadRequestHandler: RequestHandler = (request, response, next) => {
   const parsed = createMediaUploadRequestSchema.safeParse(request.body);
@@ -47,6 +51,23 @@ export const completeMediaUploadHandler: RequestHandler = (request, response, ne
       response.status(200).json({
         data: result,
       });
+    })
+    .catch(next);
+};
+
+export const getMediaUploadStatusHandler: RequestHandler = (request, response, next) => {
+  const parsed = completeMediaUploadParamsSchema.safeParse(request.params);
+
+  if (!parsed.success) {
+    next(
+      new AppError('El identificador de la imagen no es válido.', 400, 'MEDIA_ASSET_INVALID_ID'),
+    );
+    return;
+  }
+
+  void getMediaUploadStatus(getAuthenticatedUser(request), parsed.data.mediaAssetId)
+    .then((result) => {
+      response.status(200).json({ data: result });
     })
     .catch(next);
 };

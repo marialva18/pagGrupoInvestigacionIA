@@ -20,12 +20,15 @@ export async function listMediaLibrary() {
     },
     orderBy: { createdAt: 'desc' },
     take: 100,
-    select: mediaReferenceSelect,
+    select: {
+      ...mediaReferenceSelect,
+      originalFilename: true,
+    },
   });
 
   return mediaAssets.flatMap((mediaAsset) => {
     const mapped = mapMediaReference(mediaAsset);
-    return mapped ? [mapped] : [];
+    return mapped ? [{ ...mapped, originalFilename: mediaAsset.originalFilename }] : [];
   });
 }
 

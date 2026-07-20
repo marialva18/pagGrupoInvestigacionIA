@@ -1,9 +1,5 @@
 import { z } from 'zod';
-
-const newsBlockSchema = z.object({
-  type: z.string().trim().min(1).max(50),
-  data: z.record(z.string(), z.any()).default({}),
-});
+import { newsBodyInputSchema } from '../../common/content/rich-text-body.js';
 
 export const createNewsSchema = z.object({
   title: z.string().trim().min(5).max(220),
@@ -21,10 +17,7 @@ export const createNewsSchema = z.object({
 
   summary: z.string().trim().min(20).max(600),
 
-  body: z.object({
-    version: z.number().int().positive().default(1),
-    blocks: z.array(newsBlockSchema).max(500),
-  }),
+  body: newsBodyInputSchema,
 
   categoryIds: z
     .array(z.string().uuid())
@@ -92,12 +85,7 @@ export const updateNewsSchema = z
 
     summary: z.string().trim().min(20).max(600).optional(),
 
-    body: z
-      .object({
-        version: z.number().int().positive().default(1),
-        blocks: z.array(newsBlockSchema).max(500),
-      })
-      .optional(),
+    body: newsBodyInputSchema.optional(),
 
     categoryIds: z
       .array(z.string().uuid())

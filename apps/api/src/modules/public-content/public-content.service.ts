@@ -1,24 +1,14 @@
 import {
-  richTextBodySchema,
   type PublicAcademicSource,
   type PublicNewsDetail,
   type PublicNewsSummary,
-  type RichTextBody,
 } from '@intgarti/contracts';
 import { getPrismaClient } from '@intgarti/database';
 import { AppError } from '../../common/errors/app-error.js';
+import { normalizeStoredRichTextBody } from '../../common/content/rich-text-body.js';
 import { mapMediaReference, mediaReferenceSelect } from '../media/media-reference.js';
 import { listPublicMembers } from '../members/members.service.js';
 import type { PublicNewsListInput } from './public-content.schema.js';
-
-const emptyRichTextBody: RichTextBody = {
-  schemaVersion: 1,
-  editor: 'tiptap',
-  document: {
-    type: 'doc',
-    content: [],
-  },
-};
 
 const publicNewsSelect = {
   id: true,
@@ -49,12 +39,6 @@ const publicNewsSelect = {
     select: mediaReferenceSelect,
   },
 } as const;
-
-function parseRichTextBody(value: unknown): RichTextBody {
-  const parsed = richTextBodySchema.safeParse(value);
-
-  return parsed.success ? parsed.data : emptyRichTextBody;
-}
 
 function mapPublicNewsSummary(news: {
   id: string;
@@ -213,7 +197,7 @@ export async function getPublicNewsBySlug(slug: string): Promise<PublicNewsDetai
 
   return {
     ...mapPublicNewsSummary(news),
-    body: parseRichTextBody(news.body),
+    body: normalizeStoredRichTextBody(news.body),
     seoTitle: news.seoTitle,
     metaDescription: news.metaDescription,
   };

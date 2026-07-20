@@ -10,6 +10,18 @@ const uploadSchema = z.object({
   uploadUrl: z.string().url(),
   requiredHeaders: z.record(z.string(), z.string()),
 });
+const completedUploadSchema = z
+  .object({
+    mediaAssetId: z.string().uuid(),
+    status: z.enum(['PROCESSING', 'READY']),
+    alreadyCompleted: z.boolean(),
+  })
+  .passthrough();
+
+const wait = (milliseconds: number) =>
+  new Promise<void>((resolve) => {
+    window.setTimeout(resolve, milliseconds);
+  });
 const empty = {
   fullName: '',
   roleTitle: '',
@@ -26,6 +38,7 @@ export default function MemberManager() {
   const [items, setItems] = useState<EditorMember[]>([]),
     [form, setForm] = useState(empty),
     [editing, setEditing] = useState<string | null>(null),
+    [formOpen, setFormOpen] = useState(false),
     [message, setMessage] = useState(''),
     [busy, setBusy] = useState(false);
   const token = () => getEditorAccessToken();
@@ -53,6 +66,17 @@ export default function MemberManager() {
       displayOrder: m.displayOrder,
       active: m.active,
     });
+    setFormOpen(true);
+  }
+  function create() {
+    setEditing(null);
+    setForm(empty);
+    setFormOpen(true);
+  }
+  function closeForm() {
+    setEditing(null);
+    setForm(empty);
+    setFormOpen(false);
   }
   async function upload(file: File) {
     const t = token();
@@ -75,12 +99,37 @@ export default function MemberManager() {
         body: file,
       });
       if (!put.ok) throw new Error('No fue posible subir la foto.');
-      await apiRequest(`/editor/media/${u.mediaAssetId}/complete`, z.unknown(), {
-        method: 'POST',
-        accessToken: t,
-      });
-      setForm((x) => ({ ...x, photoMediaId: u.mediaAssetId }));
-      setMessage('Foto cargada; guarda el perfil.');
+      let completed = await apiRequest(
+        `/editor/media/${u.mediaAssetId}/complete`,
+        completedUploadSchema,
+        {
+          method: 'POST',
+          accessToken: t,
+        },
+      );
+
+      for (let attempt = 0; completed.status !== 'READY' && attempt < 20; attempt += 1) {
+        setMessage('Procesando fotografía…');
+        await wait(1500);
+
+        completed = await apiRequest(
+          `/editor/media/${u.mediaAssetId}/complete`,
+          completedUploadSchema,
+          {
+            method: 'POST',
+            accessToken: t,
+          },
+        );
+      }
+
+      if (completed.status !== 'READY') {
+        throw new Error(
+          'La fotografía todavía se está procesando. Espera unos segundos y vuelve a seleccionarla.',
+        );
+      }
+
+      setForm((current) => ({ ...current, photoMediaId: u.mediaAssetId }));
+      setMessage('Fotografía lista. Ya puedes guardar el perfil.');
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'No fue posible cargar la foto.');
     } finally {
@@ -107,6 +156,7 @@ export default function MemberManager() {
       );
       setForm(empty);
       setEditing(null);
+      setFormOpen(false);
       await load();
       setMessage('Miembro guardado.');
     } catch (e) {
@@ -117,116 +167,169 @@ export default function MemberManager() {
   }
   return (
     <div className="member-manager">
-      <form className="editorial-card" onSubmit={save}>
-        <h2>{editing ? 'Editar miembro' : 'Nuevo miembro'}</h2>
-        <label className="editorial-field">
-          Nombre
-          <input
-            value={form.fullName}
-            onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-            required
-          />
-        </label>
-        <label className="editorial-field">
-          Cargo, grado o condición
-          <input
-            value={form.roleTitle}
-            onChange={(e) => setForm({ ...form, roleTitle: e.target.value })}
-            required
-          />
-        </label>
-        <label className="editorial-field wide">
-          Biografía
-          <textarea
-            value={form.biography}
-            onChange={(e) => setForm({ ...form, biography: e.target.value })}
-          />
-        </label>
-        <label className="editorial-field">
-          Correo
-          <input
-            type="email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-          />
-        </label>
-        <label className="editorial-field">
-          ORCID
-          <input
-            type="url"
-            value={form.orcidUrl}
-            onChange={(e) => setForm({ ...form, orcidUrl: e.target.value })}
-          />
-        </label>
-        <label className="editorial-field">
-          LinkedIn
-          <input
-            type="url"
-            value={form.linkedinUrl}
-            onChange={(e) => setForm({ ...form, linkedinUrl: e.target.value })}
-          />
-        </label>
-        <label className="editorial-field">
-          Orden
-          <input
-            type="number"
-            value={form.displayOrder}
-            onChange={(e) => setForm({ ...form, displayOrder: Number(e.target.value) })}
-          />
-        </label>
-        <label>
-          Fotografía
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])}
-          />
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={form.isCoordinator}
-            onChange={(e) => setForm({ ...form, isCoordinator: e.target.checked })}
-          />{' '}
-          Es coordinador
-        </label>
-        <footer>
-          <button className="editorial-button" disabled={busy}>
-            Guardar
-          </button>
-          {editing && (
-            <button
-              type="button"
-              onClick={() => {
-                setEditing(null);
-                setForm(empty);
-              }}
-            >
-              Cancelar
-            </button>
-          )}
-        </footer>
-      </form>
       <section className="editorial-card">
         <header className="editorial-card__header">
-          <h2>Directorio</h2>
+          <div>
+            <h2>Directorio</h2>
+            <p>{items.length} perfiles registrados</p>
+          </div>
+          <button className="editorial-button" type="button" onClick={create}>
+            Nuevo miembro
+          </button>
         </header>
-        {items.map((m) => (
-          <article key={m.id}>
-            {m.photoMedia ? <img src={m.photoMedia.url} alt="" /> : <span>{m.fullName[0]}</span>}
-            <div>
-              <strong>{m.fullName}</strong>
-              <small>
-                {m.roleTitle}
-                {m.isCoordinator ? ' · Coordinador' : ''}
-              </small>
-            </div>
-            <button onClick={() => edit(m)}>Editar</button>
-          </article>
-        ))}
+        <div className="member-list">
+          {items.map((m) => (
+            <article key={m.id}>
+              {m.photoMedia ? <img src={m.photoMedia.url} alt="" /> : <span>{m.fullName[0]}</span>}
+              <div className="member-copy">
+                <strong title={m.fullName}>{m.fullName}</strong>
+                <small title={m.roleTitle}>
+                  {m.roleTitle}
+                  {m.isCoordinator ? ' · Coordinador' : ''}
+                </small>
+                {m.email && <small className="member-email">{m.email}</small>}
+              </div>
+              <span className={`member-state ${m.active ? 'is-active' : ''}`}>
+                {m.active ? 'Activo' : 'Inactivo'}
+              </span>
+              <button className="member-edit" type="button" onClick={() => edit(m)}>
+                Editar
+              </button>
+            </article>
+          ))}
+          {items.length === 0 && <p className="editorial-empty">Todavía no hay miembros.</p>}
+        </div>
       </section>
+
+      {formOpen && (
+        <div
+          className="member-drawer"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="member-title"
+        >
+          <button
+            className="member-drawer__backdrop"
+            type="button"
+            onClick={closeForm}
+            aria-label="Cerrar formulario"
+          />
+          <section className="member-drawer__panel">
+            <header>
+              <div>
+                <span>{editing ? 'Actualizar perfil' : 'Nuevo perfil'}</span>
+                <h2 id="member-title">{editing ? 'Editar miembro' : 'Agregar miembro'}</h2>
+              </div>
+              <button type="button" onClick={closeForm} aria-label="Cerrar">
+                ×
+              </button>
+            </header>
+            <form onSubmit={save}>
+              <div className="member-form-grid">
+                <label className="editorial-field wide">
+                  Nombre completo
+                  <input
+                    value={form.fullName}
+                    maxLength={180}
+                    onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+                    required
+                  />
+                </label>
+                <label className="editorial-field wide">
+                  Cargo, grado o condición
+                  <input
+                    value={form.roleTitle}
+                    maxLength={180}
+                    onChange={(e) => setForm({ ...form, roleTitle: e.target.value })}
+                    required
+                  />
+                </label>
+                <label className="editorial-field wide">
+                  Biografía
+                  <textarea
+                    rows={6}
+                    value={form.biography}
+                    onChange={(e) => setForm({ ...form, biography: e.target.value })}
+                  />
+                </label>
+                <label className="editorial-field wide">
+                  Correo
+                  <input
+                    type="email"
+                    value={form.email}
+                    maxLength={320}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  />
+                </label>
+                <label className="editorial-field">
+                  ORCID
+                  <input
+                    type="url"
+                    value={form.orcidUrl}
+                    onChange={(e) => setForm({ ...form, orcidUrl: e.target.value })}
+                  />
+                </label>
+                <label className="editorial-field">
+                  LinkedIn
+                  <input
+                    type="url"
+                    value={form.linkedinUrl}
+                    onChange={(e) => setForm({ ...form, linkedinUrl: e.target.value })}
+                  />
+                </label>
+                <label className="editorial-field">
+                  Orden
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.displayOrder}
+                    onChange={(e) => setForm({ ...form, displayOrder: Number(e.target.value) })}
+                  />
+                </label>
+                <label className="member-photo-field">
+                  Fotografía
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])}
+                  />
+                  <small>JPG, PNG o WebP. Máximo 10 MB.</small>
+                </label>
+                <label className="member-check">
+                  <input
+                    type="checkbox"
+                    checked={form.isCoordinator}
+                    onChange={(e) => setForm({ ...form, isCoordinator: e.target.checked })}
+                  />{' '}
+                  Es coordinador
+                </label>
+                <label className="member-check">
+                  <input
+                    type="checkbox"
+                    checked={form.active}
+                    onChange={(e) => setForm({ ...form, active: e.target.checked })}
+                  />{' '}
+                  Perfil activo
+                </label>
+              </div>
+              <footer>
+                <button
+                  className="editorial-button editorial-button--secondary"
+                  type="button"
+                  onClick={closeForm}
+                >
+                  Cancelar
+                </button>
+                <button className="editorial-button" disabled={busy}>
+                  {busy ? 'Guardando…' : 'Guardar cambios'}
+                </button>
+              </footer>
+            </form>
+          </section>
+        </div>
+      )}
       <EditorialToast message={message} onClose={() => setMessage('')} />
-      <style>{`.member-manager{display:grid;grid-template-columns:minmax(320px,.8fr) 1.2fr;gap:18px}.member-manager form{padding:22px;display:grid;grid-template-columns:1fr 1fr;gap:14px}.member-manager form h2,.member-manager .wide,.member-manager footer{grid-column:1/-1}.member-manager footer{display:flex;gap:8px}.member-manager article{padding:14px 20px;border-top:1px solid var(--editorial-line);display:flex;align-items:center;gap:12px}.member-manager article img,.member-manager article>span{width:48px;height:48px;object-fit:cover;border-radius:50%;display:grid;place-items:center;background:var(--color-navy);color:white}.member-manager article div{display:grid;margin-right:auto}.member-manager article small{color:var(--editorial-muted)}@media(max-width:900px){.member-manager{grid-template-columns:1fr}}@media(max-width:520px){.member-manager form{grid-template-columns:1fr}.member-manager form h2,.member-manager .wide,.member-manager footer{grid-column:auto}}`}</style>
+      <style>{`.member-manager{min-width:0}.member-manager>.editorial-card{overflow:hidden}.member-list{min-width:0}.member-manager article{min-width:0;padding:14px 20px;border-top:1px solid var(--editorial-line);display:grid;grid-template-columns:48px minmax(0,1fr) auto auto;align-items:center;gap:14px}.member-manager article img,.member-manager article>span:first-child{width:48px;height:48px;object-fit:cover;border-radius:50%;display:grid;place-items:center;background:var(--color-navy);color:white}.member-copy{min-width:0;display:grid;gap:3px}.member-copy strong,.member-copy small{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.member-copy small{color:var(--editorial-muted)}.member-email{font-size:.78rem}.member-state{padding:5px 9px;border-radius:999px;color:var(--editorial-muted);background:#f0efeb;font-size:.75rem;font-weight:750}.member-state.is-active{color:#17623b;background:#e8f5ee}.member-edit{min-height:36px;padding:0 13px;border:1px solid var(--editorial-line);border-radius:8px;color:var(--color-navy);background:white;font-weight:750;cursor:pointer}.member-drawer{position:fixed;z-index:80;inset:0;display:flex;justify-content:flex-end}.member-drawer__backdrop{position:absolute;inset:0;border:0;background:rgb(13 25 37 / 48%);backdrop-filter:blur(2px)}.member-drawer__panel{position:relative;width:min(680px,100%);height:100%;min-width:0;overflow-x:hidden;overflow-y:auto;background:white;box-shadow:-20px 0 50px rgb(13 25 37 / 18%)}.member-drawer__panel>header{position:sticky;z-index:2;top:0;padding:22px 26px;display:flex;justify-content:space-between;gap:18px;border-bottom:1px solid var(--editorial-line);background:rgb(255 255 255 / 96%)}.member-drawer__panel>header span{color:var(--editorial-accent);font-size:.78rem;font-weight:800;text-transform:uppercase}.member-drawer__panel>header h2{margin:5px 0 0;color:var(--color-navy)}.member-drawer__panel>header>button{border:0;background:transparent;font-size:1.8rem;cursor:pointer}.member-drawer form{padding:24px 26px}.member-form-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:15px}.member-form-grid>*{min-width:0}.member-form-grid .wide{grid-column:1/-1}.member-form-grid input,.member-form-grid textarea{max-width:100%;box-sizing:border-box}.member-photo-field{grid-column:1/-1;padding:16px;display:grid;gap:8px;border:1px dashed var(--editorial-line);border-radius:10px;color:var(--color-navy);font-weight:700;overflow:hidden}.member-photo-field input{width:100%;font-weight:400}.member-photo-field small{color:var(--editorial-muted);font-weight:400}.member-check{display:flex;align-items:center;gap:8px;color:var(--color-navy);font-size:.88rem;font-weight:650}.member-check input{accent-color:var(--editorial-accent)}.member-drawer footer{position:sticky;bottom:0;margin:24px -26px -24px;padding:16px 26px;display:flex;justify-content:flex-end;gap:9px;border-top:1px solid var(--editorial-line);background:white}@media(max-width:650px){.member-manager .editorial-card__header{align-items:flex-start;flex-direction:column}.member-manager .editorial-card__header .editorial-button{width:100%}.member-manager article{grid-template-columns:44px minmax(0,1fr) auto}.member-manager article img,.member-manager article>span:first-child{width:44px;height:44px}.member-state{display:none}.member-edit{grid-column:2/-1;width:100%}.member-form-grid{grid-template-columns:1fr}.member-form-grid .wide,.member-photo-field{grid-column:auto}.member-drawer form,.member-drawer__panel>header{padding-inline:18px}.member-drawer footer{margin-inline:-18px;padding-inline:18px}}`}</style>
     </div>
   );
 }

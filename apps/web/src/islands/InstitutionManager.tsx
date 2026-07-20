@@ -21,7 +21,7 @@ export default function InstitutionManager() {
     const t = getEditorAccessToken();
     if (!t) return;
     void apiRequest('/editor/institution', institutionProfileSchema, { accessToken: t })
-      .then(({ heroMedia: _, groupMedia: __, updatedAt: ___, ...value }) => setForm(value))
+      .then((profile) => setForm(institutionProfileInputSchema.parse(profile)))
       .catch((e) =>
         setMessage(e instanceof Error ? e.message : 'No fue posible cargar el contenido.'),
       );
@@ -76,8 +76,7 @@ export default function InstitutionManager() {
         accessToken: t,
         body: JSON.stringify(form),
       });
-      const { heroMedia: _, groupMedia: __, updatedAt: ___, ...value } = saved;
-      setForm(value);
+      setForm(institutionProfileInputSchema.parse(saved));
       setMessage('Contenido institucional publicado.');
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'No fue posible guardar.');

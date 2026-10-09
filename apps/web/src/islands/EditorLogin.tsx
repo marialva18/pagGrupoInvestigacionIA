@@ -3,7 +3,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { z } from 'zod';
 import { EditorialLoadingOverlay, EditorialToast } from '../components/editorial/EditorialFeedback';
 import { apiRequest, ApiRequestError } from '../lib/api-client';
-import { safeEditorRedirect } from '../lib/auth/auth-feedback';
+import { invitationRedirectFromLogin, safeEditorRedirect } from '../lib/auth/auth-feedback';
 import { loginWithEditorialSession } from '../lib/auth/login-flow';
 import {
   cacheEditorUser,
@@ -43,6 +43,12 @@ export default function EditorLogin() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    const invitationRedirect = invitationRedirectFromLogin(window.location.href);
+    if (invitationRedirect) {
+      setLoading(true);
+      window.location.replace(invitationRedirect);
+      return;
+    }
     setRemember(shouldRememberEditorSession());
 
     const token = getEditorAccessToken();

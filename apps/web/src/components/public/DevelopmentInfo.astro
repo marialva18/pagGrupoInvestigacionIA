@@ -1,0 +1,170 @@
+<button
+  class="development-link"
+  type="button"
+  data-development-open
+  aria-haspopup="dialog"
+  aria-controls="development-info"
+>
+  Sobre el desarrollo
+</button>
+
+<dialog
+  id="development-info"
+  aria-labelledby="development-title"
+  aria-describedby="development-description"
+>
+  <div class="development-panel">
+    <button
+      class="close"
+      type="button"
+      data-development-close
+      aria-label="Cerrar Sobre el desarrollo"
+      autofocus>✕</button
+    >
+    <h2 id="development-title">Sobre el desarrollo</h2>
+    <p id="development-description">
+      Esta plataforma fue desarrollada para apoyar la difusión de información, actividades y
+      contenidos académicos del Grupo de Investigación de Inteligencia Artificial de la Universidad
+      Nacional Mayor de San Marcos.
+    </p>
+    <h3>Desarrollo e implementación</h3>
+    <ul>
+      <li>María de Jesús Alva Ruiz</li>
+      <li>José Luis Tenorio Tenorio</li>
+      <li>Gustavo Alejandro Vila Valenzuela</li>
+    </ul>
+    <h3>Documentación del proyecto</h3>
+    <ul>
+      <li>Sofía Butrón Verástegui</li>
+      <li>Diego Ríos</li>
+    </ul>
+    <p class="version">PAG WEB IA · Primera versión · 2026</p>
+  </div>
+</dialog>
+
+<script>
+  const trigger = document.querySelector<HTMLButtonElement>('[data-development-open]');
+  const dialog = document.querySelector<HTMLDialogElement>('#development-info');
+  const close = dialog?.querySelector<HTMLButtonElement>('[data-development-close]');
+  if (trigger && dialog && close) {
+    let bodyOverflow = '';
+    let rootOverflow = '';
+    trigger.addEventListener('click', () => {
+      if (dialog.open) return;
+      bodyOverflow = document.body.style.overflow;
+      rootOverflow = document.documentElement.style.overflow;
+      dialog.showModal();
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+    });
+    close.addEventListener('click', () => dialog.close());
+    let startedOutside = false;
+    const outside = (event: MouseEvent) => {
+      const bounds = dialog.getBoundingClientRect();
+      return (
+        event.target === dialog &&
+        (event.clientX < bounds.left ||
+          event.clientX > bounds.right ||
+          event.clientY < bounds.top ||
+          event.clientY > bounds.bottom)
+      );
+    };
+    dialog.addEventListener('pointerdown', (event) => {
+      startedOutside = outside(event);
+    });
+    dialog.addEventListener('click', (event) => {
+      if (startedOutside && outside(event)) dialog.close();
+      startedOutside = false;
+    });
+    dialog.addEventListener('close', () => {
+      document.body.style.overflow = bodyOverflow;
+      document.documentElement.style.overflow = rootOverflow;
+      trigger.focus({ preventScroll: true });
+    });
+  }
+</script>
+
+<style>
+  .development-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+    cursor: pointer;
+  }
+  .development-link:hover {
+    color: white;
+  }
+  button:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 5px;
+  }
+  dialog {
+    margin: auto;
+    width: min(560px, calc(100% - 32px));
+    max-width: calc(100% - 32px);
+    max-height: calc(100dvh - 32px);
+    padding: 0;
+    border: 1px solid var(--color-line);
+    border-radius: 16px;
+    background: var(--color-ivory);
+    color: var(--color-text);
+    box-shadow: 0 24px 80px rgb(0 0 0 / 25%);
+    font-size: 1rem;
+    overflow: auto;
+  }
+  dialog::backdrop {
+    background: rgb(16 35 52 / 65%);
+  }
+  .development-panel {
+    position: relative;
+    padding: clamp(24px, 5vw, 40px);
+  }
+  .close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--color-navy);
+    font-size: 1.2rem;
+    cursor: pointer;
+  }
+  .close:hover {
+    background: rgb(119 37 54 / 8%);
+  }
+  h2 {
+    margin: 8px 36px 20px 0;
+    font-family: var(--font-heading);
+    color: var(--color-navy);
+    font-size: clamp(1.6rem, 5vw, 2rem);
+    line-height: 1.2;
+  }
+  p,
+  li {
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+  }
+  h3 {
+    margin: 24px 0 10px;
+    color: var(--color-burgundy);
+    font-size: 1rem;
+  }
+  ul {
+    margin: 0;
+    padding-left: 20px;
+  }
+  .version {
+    margin: 28px 0 0;
+    padding-top: 18px;
+    border-top: 1px solid var(--color-line);
+    color: var(--color-muted);
+    font-size: 0.8rem;
+  }
+</style>

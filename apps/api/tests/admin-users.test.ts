@@ -189,3 +189,31 @@ test('rejects an invalid user identifier', async () => {
     assert.equal(response.status, 400);
   });
 });
+
+test('resend invitation requires authentication and forbids editor role', async () => {
+  await withServer(async (baseUrl) => {
+    for (const [token, status] of [
+      [null, 401],
+      ['editor-token', 403],
+    ] as const) {
+      const response = await fetch(
+        `${baseUrl}/api/v1/admin/users/${editorUser.id}/resend-invitation`,
+        {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        },
+      );
+      assert.equal(response.status, status);
+    }
+  });
+});
+
+test('administrator resend validates identifiers before touching services', async () => {
+  await withServer(async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/admin/users/not-a-uuid/resend-invitation`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer admin-token' },
+    });
+    assert.equal(response.status, 400);
+  });
+});

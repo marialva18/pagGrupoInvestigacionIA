@@ -4,7 +4,7 @@ const links = [
   ['/', 'Inicio'],
   ['/noticias', 'Noticias'],
   ['/fuentes-academicas', 'Fuentes académicas'],
-  ['/grupo', 'El grupo'],
+  ['/grupo', 'Grupo'],
   ['/miembros', 'Miembros'],
   ['/contacto', 'Contacto'],
 ];

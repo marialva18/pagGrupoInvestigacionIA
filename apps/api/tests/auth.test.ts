@@ -123,6 +123,20 @@ test('extracts a valid Bearer token', () => {
   assert.equal(extractBearerToken('bearer another-token'), 'another-token');
 });
 
+test('invitation activation route rejects missing or malformed bearer without contacting providers', async () => {
+  await withServer(createTestApp(), async (baseUrl) => {
+    for (const authorization of ['', 'Basic invalid', 'Bearer ']) {
+      const response = await fetch(`${baseUrl}/auth/activate-invitation`, {
+        method: 'POST',
+        headers: authorization ? { authorization } : {},
+      });
+      assert.equal(response.status, 401);
+      const body = await response.json();
+      assert.equal(body.error.code, 'AUTH_REQUIRED');
+    }
+  });
+});
+
 test('rejects invalid authorization formats', () => {
   assert.equal(extractBearerToken(undefined), null);
   assert.equal(extractBearerToken('Basic credentials'), null);

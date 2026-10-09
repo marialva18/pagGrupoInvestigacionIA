@@ -1,5 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": [".env"],
   "tasks": {
     "dev": {
       "cache": false,
@@ -7,6 +8,15 @@
     },
     "build": {
       "dependsOn": ["^build"],
+      "env": [
+        "PUBLIC_WEB_URL",
+        "PUBLIC_API_URL",
+        "API_INTERNAL_URL",
+        "PUBLIC_SUPABASE_URL",
+        "PUBLIC_SUPABASE_ANON_KEY",
+        "DATABASE_URL",
+        "DIRECT_URL"
+      ],
       "outputs": ["dist/**", ".astro/**"]
     },
     "check": {

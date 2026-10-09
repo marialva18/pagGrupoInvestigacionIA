@@ -3,6 +3,7 @@ import { getPrismaClient } from '@intgarti/database';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { AppError } from '../../common/errors/app-error.js';
 import { env } from '../../config/env.js';
+import { authProviderError } from './auth-provider-error.js';
 import type {
   AuthenticateAccessToken,
   VerifiedSupabaseIdentity,
@@ -25,6 +26,7 @@ function getSupabaseAuthClient(): SupabaseClient {
       autoRefreshToken: false,
       persistSession: false,
       detectSessionInUrl: false,
+      flowType: 'implicit',
     },
   });
 
@@ -42,6 +44,7 @@ export const verifySupabaseAccessToken: VerifySupabaseAccessToken = async (
   } = await supabase.auth.getUser(accessToken);
 
   if (error || !user) {
+    if (error) throw authProviderError(error);
     throw new AppError(
       'El token de autenticación no es válido o ha expirado.',
       401,

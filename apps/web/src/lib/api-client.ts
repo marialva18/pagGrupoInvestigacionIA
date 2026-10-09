@@ -8,6 +8,8 @@ const configuredApiBaseUrl = import.meta.env.SSR
 const API_BASE_URL =
   typeof configuredApiBaseUrl === 'string' ? configuredApiBaseUrl.replace(/\/+$/, '') : '';
 
+const pendingSessions = new Map<string, Promise<Response>>();
+
 export interface ApiRequestOptions extends RequestInit {
   accessToken?: string;
 }
@@ -58,11 +60,37 @@ export async function apiRequest<T>(
     headers.set('Authorization', `Bearer ${accessToken}`);
   }
 
-  const response = await fetch(getApiUrl(path), {
-    ...requestInit,
-    credentials: 'include',
-    headers,
-  });
+  const url = getApiUrl(path);
+  const fetchResponse = () =>
+    fetch(url, {
+      ...requestInit,
+      credentials: requestInit.credentials ?? 'omit',
+      headers,
+    });
+  // Separate islands can validate the same token simultaneously. Share only in-flight
+  // browser GETs; never cache authorization results or share across SSR requests.
+  const canShare =
+    typeof window !== 'undefined' &&
+    path === '/auth/session' &&
+    (!requestInit.method || requestInit.method === 'GET') &&
+    !requestInit.signal &&
+    !requestInit.body &&
+    !configuredHeaders &&
+    requestInit.credentials === undefined;
+  let response: Response;
+  if (canShare) {
+    const key = `${url}:${accessToken ?? ''}`;
+    let pending = pendingSessions.get(key);
+    if (!pending) {
+      pending = fetchResponse().finally(() => {
+        pendingSessions.delete(key);
+      });
+      pendingSessions.set(key, pending);
+    }
+    response = (await pending).clone();
+  } else {
+    response = await fetchResponse();
+  }
 
   const rawBody: unknown = response.status === 204 ? null : await response.json().catch(() => null);
 

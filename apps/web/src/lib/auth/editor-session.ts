@@ -2,6 +2,22 @@ const ACCESS_TOKEN_KEY = 'intgarti.editor.access-token';
 const PERSISTENCE_KEY = 'intgarti.editor.remember';
 const USER_CACHE_KEY = 'intgarti.editor.user';
 
+function browserStorage(kind: 'localStorage' | 'sessionStorage'): Storage | null {
+  try {
+    return typeof window === 'undefined' ? null : window[kind];
+  } catch {
+    return null;
+  }
+}
+
+function removeStorage(storage: Storage | null, key: string): void {
+  try {
+    storage?.removeItem(key);
+  } catch {
+    /* Storage may be blocked by the browser. */
+  }
+}
+
 export interface CachedEditorUser {
   id: string;
   displayName: string;
@@ -11,17 +27,17 @@ export interface CachedEditorUser {
   lastLoginAt: string | null;
 }
 
-function readStorage(storage: Storage, key = ACCESS_TOKEN_KEY): string | null {
+function readStorage(storage: Storage | null, key = ACCESS_TOKEN_KEY): string | null {
   try {
-    return storage.getItem(key);
+    return storage?.getItem(key) ?? null;
   } catch {
     return null;
   }
 }
 
-function writeStorage(storage: Storage, key: string, value: string): void {
+function writeStorage(storage: Storage | null, key: string, value: string): void {
   try {
-    storage.setItem(key, value);
+    storage?.setItem(key, value);
   } catch {
     // La sesión seguirá funcionando aunque el navegador bloquee el almacenamiento.
   }
@@ -30,35 +46,41 @@ function writeStorage(storage: Storage, key: string, value: string): void {
 export function getEditorAccessToken(): string | null {
   if (typeof window === 'undefined') return null;
 
-  return readStorage(window.sessionStorage) ?? readStorage(window.localStorage);
+  return (
+    readStorage(browserStorage('sessionStorage')) ?? readStorage(browserStorage('localStorage'))
+  );
 }
 
 export function setEditorAccessToken(accessToken: string, remember = false): void {
-  const primaryStorage = remember ? window.localStorage : window.sessionStorage;
-  const secondaryStorage = remember ? window.sessionStorage : window.localStorage;
-
-  secondaryStorage.removeItem(ACCESS_TOKEN_KEY);
-  primaryStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-  window.localStorage.setItem(PERSISTENCE_KEY, String(remember));
+  const primaryStorage = browserStorage(remember ? 'localStorage' : 'sessionStorage');
+  const secondaryStorage = browserStorage(remember ? 'sessionStorage' : 'localStorage');
+  try {
+    if (!primaryStorage) throw new Error('Storage unavailable');
+    primaryStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  } catch {
+    throw new Error('Permite el almacenamiento del navegador para iniciar sesión.');
+  }
+  removeStorage(secondaryStorage, ACCESS_TOKEN_KEY);
+  writeStorage(browserStorage('localStorage'), PERSISTENCE_KEY, String(remember));
 }
 
 export function cacheEditorUser(user: CachedEditorUser, remember = false): void {
   if (typeof window === 'undefined') return;
 
-  const primaryStorage = remember ? window.localStorage : window.sessionStorage;
-  const secondaryStorage = remember ? window.sessionStorage : window.localStorage;
+  const primaryStorage = browserStorage(remember ? 'localStorage' : 'sessionStorage');
+  const secondaryStorage = browserStorage(remember ? 'sessionStorage' : 'localStorage');
 
-  secondaryStorage.removeItem(USER_CACHE_KEY);
+  removeStorage(secondaryStorage, USER_CACHE_KEY);
   writeStorage(primaryStorage, USER_CACHE_KEY, JSON.stringify(user));
-  writeStorage(window.localStorage, 'intgarti.editor.role', user.role);
+  writeStorage(browserStorage('localStorage'), 'intgarti.editor.role', user.role);
 }
 
 export function getCachedEditorUser(): CachedEditorUser | null {
   if (typeof window === 'undefined') return null;
 
   const raw =
-    readStorage(window.sessionStorage, USER_CACHE_KEY) ??
-    readStorage(window.localStorage, USER_CACHE_KEY);
+    readStorage(browserStorage('sessionStorage'), USER_CACHE_KEY) ??
+    readStorage(browserStorage('localStorage'), USER_CACHE_KEY);
 
   if (!raw) return null;
 
@@ -82,15 +104,15 @@ export function getCachedEditorUser(): CachedEditorUser | null {
 
 export function shouldRememberEditorSession(): boolean {
   if (typeof window === 'undefined') return false;
-  return window.localStorage.getItem(PERSISTENCE_KEY) === 'true';
+  return readStorage(browserStorage('localStorage'), PERSISTENCE_KEY) === 'true';
 }
 
 export function clearEditorAccessToken(): void {
   if (typeof window === 'undefined') return;
-  window.sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-  window.localStorage.removeItem(ACCESS_TOKEN_KEY);
-  window.sessionStorage.removeItem(USER_CACHE_KEY);
-  window.localStorage.removeItem(USER_CACHE_KEY);
-  window.localStorage.removeItem('intgarti.editor.role');
-  window.localStorage.removeItem(PERSISTENCE_KEY);
+  for (const kind of ['sessionStorage', 'localStorage'] as const) {
+    const storage = browserStorage(kind);
+    for (const key of [ACCESS_TOKEN_KEY, USER_CACHE_KEY, 'intgarti.editor.role', PERSISTENCE_KEY]) {
+      removeStorage(storage, key);
+    }
+  }
 }

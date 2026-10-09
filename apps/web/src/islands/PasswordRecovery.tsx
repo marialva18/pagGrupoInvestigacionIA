@@ -1,12 +1,13 @@
-import { createClient, type Session } from '@supabase/supabase-js';
+import type { Session } from '@supabase/supabase-js';
+import { getBrowserSupabase } from '../lib/auth/supabase-browser';
+import { isAuthCallback, passwordErrorMessage } from '../lib/auth/auth-feedback';
 import { useEffect, useState, type FormEvent } from 'react';
 import { z } from 'zod';
 import { EditorialLoadingOverlay, EditorialToast } from '../components/editorial/EditorialFeedback';
 import { apiRequest } from '../lib/api-client';
-import { setEditorAccessToken } from '../lib/auth/editor-session';
+import { clearEditorAccessToken } from '../lib/auth/editor-session';
 
 const messageSchema = z.object({ message: z.string() });
-const sessionSchema = z.object({ user: z.object({ displayName: z.string() }) });
 const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
 
@@ -28,18 +29,41 @@ export default function PasswordRecovery() {
       return;
     }
 
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: true },
-    });
-
-    void supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+    const callbackUrl = window.location.href;
+    if (!isAuthCallback(callbackUrl, 'recovery')) {
+      if (window.location.hash || window.location.search) {
+        setMessageTone('error');
+        setMessage('El enlace no es válido o expiró. Solicita uno nuevo.');
+        window.history.replaceState(null, '', window.location.pathname);
+      }
       setChecking(false);
-    });
+      return;
+    }
+    let active = true;
+    void Promise.resolve()
+      .then(() => getBrowserSupabase().auth.getSession())
+      .then(({ data, error }) => {
+        if (!active) return;
+        window.history.replaceState(null, '', window.location.pathname);
+        if (error || !data.session)
+          throw new Error('El enlace no es válido o expiró. Solicita uno nuevo.');
+        setSession(data.session);
+        setChecking(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setMessageTone('error');
+        setMessage('El enlace no es válido o expiró. Solicita uno nuevo.');
+        setChecking(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   async function requestRecovery(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (loading) return;
     setLoading(true);
     setMessage('');
 
@@ -67,7 +91,7 @@ export default function PasswordRecovery() {
       return;
     }
 
-    if (!session) return;
+    if (!session || loading) return;
 
     if (password.length < 8) {
       setMessageTone('error');
@@ -85,23 +109,17 @@ export default function PasswordRecovery() {
     setMessage('');
 
     try {
-      const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-      });
-      await supabase.auth.setSession({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-      });
+      const supabase = getBrowserSupabase();
       const { error } = await supabase.auth.updateUser({ password });
-      if (error) throw new Error('No fue posible actualizar la contraseña.');
-
-      const result = await apiRequest('/auth/session', sessionSchema, {
-        accessToken: session.access_token,
-      });
-      setEditorAccessToken(session.access_token, true);
+      if (error) throw new Error(passwordErrorMessage(error));
+      clearEditorAccessToken();
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
+      setSession(null);
+      setPassword('');
+      setConfirmation('');
       setMessageTone('success');
-      setMessage(`Contraseña actualizada. Bienvenido, ${result.user.displayName}.`);
-      window.setTimeout(() => window.location.replace('/editor'), 700);
+      setMessage('Contraseña actualizada. Inicia sesión con tu nueva contraseña.');
+      window.setTimeout(() => window.location.replace('/acceso'), 1800);
     } catch (error: unknown) {
       setMessageTone('error');
       setMessage(

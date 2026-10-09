@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { z } from 'zod';
-import { apiRequest } from '../lib/api-client';
+import { apiRequest, ApiRequestError } from '../lib/api-client';
 import {
   cacheEditorUser,
   clearEditorAccessToken,
@@ -45,6 +45,7 @@ function applyRoleVisibility(role: SessionUser['role']): void {
 export default function EditorialSession() {
   const [user, setUser] = useState<SessionUser | null>(() => getCachedEditorUser());
   const [open, setOpen] = useState(false);
+  const [sessionError, setSessionError] = useState('');
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -70,9 +71,13 @@ export default function EditorialSession() {
           }),
         );
       })
-      .catch(() => {
-        clearEditorAccessToken();
-        redirectToLogin();
+      .catch((error: unknown) => {
+        if (error instanceof ApiRequestError && [401, 403].includes(error.status)) {
+          clearEditorAccessToken();
+          redirectToLogin();
+          return;
+        }
+        setSessionError('No se pudo validar el acceso. Recarga la página para reintentar.');
       });
   }, []);
 
@@ -101,6 +106,8 @@ export default function EditorialSession() {
     clearEditorAccessToken();
     window.location.replace('/acceso');
   }
+
+  if (sessionError) return <div role="alert">{sessionError}</div>;
 
   if (!user) {
     return <div className="editor-session-skeleton" aria-label="Validando sesión" />;

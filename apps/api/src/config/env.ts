@@ -96,6 +96,30 @@ export const env = {
   ),
 };
 
-export const allowedOrigins = env.WEB_ORIGINS.split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+export function parseAllowedOrigins(value: string): string[] {
+  const origins = value
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  if (!origins.length) throw new Error('WEB_ORIGINS debe contener al menos un origen.');
+  return [
+    ...new Set(
+      origins.map((origin) => {
+        const url = new URL(origin);
+        if (
+          !['http:', 'https:'].includes(url.protocol) ||
+          url.username ||
+          url.password ||
+          url.pathname !== '/' ||
+          url.search ||
+          url.hash
+        ) {
+          throw new Error('WEB_ORIGINS solo admite orígenes HTTP(S), sin rutas ni credenciales.');
+        }
+        return url.origin;
+      }),
+    ),
+  ];
+}
+
+export const allowedOrigins = parseAllowedOrigins(env.WEB_ORIGINS);

@@ -16,7 +16,7 @@ const members = await apiRequest('/public/members', z.array(publicMemberSchema))
       </p><div class="grid">
         {
           members.map((member) => (
-            <article class:list={{ coordinator: member.isCoordinator }}>
+            <article>
               {member.photoMedia ? (
                 <img
                   src={member.photoMedia.url}
@@ -51,6 +51,10 @@ const members = await apiRequest('/public/members', z.array(publicMemberSchema))
   </main><Footer /></BaseLayout
 >
 <style>
+  /* Allow the usable viewport to shrink below 320px when scrollbars occupy space. */
+  :global(body) {
+    min-width: 0;
+  }
   .page {
     padding: 90px 0;
     background: var(--color-ivory);
@@ -84,9 +88,6 @@ const members = await apiRequest('/public/members', z.array(publicMemberSchema))
     gap: 24px;
     padding: 22px;
     background: white;
-  }
-  .grid article.coordinator {
-    grid-column: 1/-1;
   }
   .member-content {
     display: flex;
@@ -135,9 +136,6 @@ const members = await apiRequest('/public/members', z.array(publicMemberSchema))
   @media (max-width: 850px) {
     .grid {
       grid-template-columns: 1fr;
-    }
-    .grid article.coordinator {
-      grid-column: auto;
     }
   }
   @media (max-width: 520px) {

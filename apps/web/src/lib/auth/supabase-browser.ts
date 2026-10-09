@@ -30,7 +30,8 @@ export function getBrowserSupabase(
         const path = new URL(callbackUrl).pathname;
         return (
           (path === '/auth/restablecer-contrasena' && params.type === 'recovery') ||
-          (path === '/auth/aceptar-invitacion' && params.type === 'invite')
+          (path === '/auth/aceptar-invitacion' &&
+            ['invite', 'recovery'].includes(params.type ?? ''))
         );
       },
     },

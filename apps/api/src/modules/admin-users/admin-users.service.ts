@@ -3,9 +3,40 @@ import { getPrismaClient } from '@intgarti/database';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { AppError } from '../../common/errors/app-error.js';
 import { env } from '../../config/env.js';
+import { requestInvitationRecovery } from '../auth/auth.service.js';
 import type { InviteUserInput, ListUsersInput, UpdateUserInput } from './admin-users.schema.js';
 
-type AdminActor = Pick<AuthenticatedUser, 'id'>;
+type AdminActor = Pick<AuthenticatedUser, 'id' | 'role'>;
+
+interface InvitationDependencies {
+  getPrisma: typeof getPrismaClient;
+  getSupabase: () => SupabaseClient;
+  sendRecovery: (email: string) => Promise<void>;
+}
+
+function requireInvitationAdmin(actor: AdminActor): void {
+  if (actor.role !== 'ADMIN')
+    throw new AppError('No tiene permisos para realizar esta operación.', 403, 'AUTH_FORBIDDEN');
+}
+
+function invitationProviderError(
+  error: { code?: string | undefined; message: string } | null,
+): AppError {
+  const registered =
+    ['email_exists', 'user_already_exists'].includes(error?.code ?? '') ||
+    /already (?:been )?registered/i.test(error?.message ?? '');
+  return registered
+    ? new AppError(
+        'La cuenta ya existe. Revisa su vinculación editorial antes de enviar otro enlace.',
+        409,
+        'ADMIN_USER_ALREADY_REGISTERED',
+      )
+    : new AppError(
+        'No fue posible enviar el enlace de activación.',
+        502,
+        'ADMIN_USER_INVITATION_RESEND_FAILED',
+      );
+}
 
 const userSelect = {
   id: true,
@@ -135,8 +166,19 @@ export async function listUsers(input: ListUsersInput) {
   };
 }
 
-export async function inviteUser(actor: AdminActor, input: InviteUserInput): Promise<CmsUser> {
-  const prisma = getPrismaClient();
+const invitationDependencies: InvitationDependencies = {
+  getPrisma: getPrismaClient,
+  getSupabase: getSupabaseAdminClient,
+  sendRecovery: requestInvitationRecovery,
+};
+
+export async function inviteUser(
+  actor: AdminActor,
+  input: InviteUserInput,
+  dependencies = invitationDependencies,
+): Promise<CmsUser> {
+  requireInvitationAdmin(actor);
+  const prisma = dependencies.getPrisma();
 
   const existing = await prisma.user.findUnique({
     where: {
@@ -156,7 +198,7 @@ export async function inviteUser(actor: AdminActor, input: InviteUserInput): Pro
     );
   }
 
-  const supabase = getSupabaseAdminClient();
+  const supabase = dependencies.getSupabase();
 
   const { data, error } = await supabase.auth.admin.inviteUserByEmail(input.email, {
     data: {
@@ -167,59 +209,52 @@ export async function inviteUser(actor: AdminActor, input: InviteUserInput): Pro
   });
 
   if (error || !data.user) {
-    throw new AppError(
-      'No fue posible enviar la invitación al usuario.',
-      502,
-      'ADMIN_USER_INVITATION_FAILED',
-      {
-        providerMessage: error?.message,
+    throw invitationProviderError(error);
+  }
+
+  return await prisma.$transaction(async (transaction) => {
+    const user = await transaction.user.create({
+      data: {
+        email: input.email,
+        displayName: input.displayName,
+        role: input.role,
+        status: 'INVITED',
+        authProviderId: data.user.id,
       },
-    );
-  }
-
-  try {
-    return await prisma.$transaction(async (transaction) => {
-      const user = await transaction.user.create({
-        data: {
-          email: input.email,
-          displayName: input.displayName,
-          role: input.role,
-          status: 'INVITED',
-          authProviderId: data.user.id,
-        },
-        select: userSelect,
-      });
-
-      await transaction.auditLog.create({
-        data: {
-          actorId: actor.id,
-          action: 'USER_INVITED',
-          entityType: 'User',
-          entityId: user.id,
-          after: {
-            email: user.email,
-            role: user.role,
-            status: user.status,
-          },
-        },
-      });
-
-      return mapCmsUser(user);
+      select: userSelect,
     });
-  } catch (error: unknown) {
-    await supabase.auth.admin.deleteUser(data.user.id).catch(() => undefined);
-    throw error;
-  }
+
+    await transaction.auditLog.create({
+      data: {
+        actorId: actor.id,
+        action: 'USER_INVITED',
+        entityType: 'User',
+        entityId: user.id,
+        after: {
+          email: user.email,
+          role: user.role,
+          status: user.status,
+        },
+      },
+    });
+
+    return mapCmsUser(user);
+  });
 }
 
-export async function resendInvitation(actor: AdminActor, userId: string): Promise<CmsUser> {
-  const prisma = getPrismaClient();
+export async function resendInvitation(
+  actor: AdminActor,
+  userId: string,
+  dependencies = invitationDependencies,
+): Promise<CmsUser> {
+  requireInvitationAdmin(actor);
+  const prisma = dependencies.getPrisma();
 
   const user = await prisma.user.findUnique({
     where: {
       id: userId,
     },
-    select: userSelect,
+    select: { ...userSelect, authProviderId: true },
   });
 
   if (!user) {
@@ -234,7 +269,65 @@ export async function resendInvitation(actor: AdminActor, userId: string): Promi
     );
   }
 
-  const supabase = getSupabaseAdminClient();
+  const supabase = dependencies.getSupabase();
+
+  const recover = async (): Promise<CmsUser> => {
+    await dependencies.sendRecovery(user.email);
+    await prisma.$transaction(async (transaction) => {
+      const pending = await transaction.user.findUnique({
+        where: { id: user.id },
+        select: { status: true, authProviderId: true, email: true },
+      });
+      if (
+        !pending ||
+        pending.status !== 'INVITED' ||
+        pending.authProviderId !== user.authProviderId ||
+        pending.email !== user.email
+      ) {
+        throw new AppError(
+          'El usuario ya no está pendiente de activación.',
+          409,
+          'ADMIN_USER_NOT_INVITED',
+        );
+      }
+      await transaction.auditLog.create({
+        data: {
+          actorId: actor.id,
+          action: 'USER_INVITATION_RECOVERY_SENT',
+          entityType: 'User',
+          entityId: user.id,
+          after: { status: 'INVITED' },
+        },
+      });
+    });
+    return mapCmsUser(user);
+  };
+
+  if (user.authProviderId) {
+    const { data: identity, error: identityError } = await supabase.auth.admin.getUserById(
+      user.authProviderId,
+    );
+    if (identityError && identityError.status !== 404) {
+      throw new AppError(
+        'No fue posible verificar la cuenta. Inténtalo de nuevo.',
+        502,
+        'ADMIN_USER_IDENTITY_VERIFICATION_FAILED',
+      );
+    }
+    if (
+      identityError ||
+      !identity.user ||
+      identity.user.id !== user.authProviderId ||
+      identity.user.email?.toLowerCase() !== user.email.toLowerCase()
+    ) {
+      throw new AppError(
+        'No se pudo verificar la vinculación de la cuenta. Solicita revisión administrativa.',
+        409,
+        'ADMIN_USER_IDENTITY_CONFLICT',
+      );
+    }
+    return recover();
+  }
 
   const { data, error } = await supabase.auth.admin.inviteUserByEmail(user.email, {
     data: {
@@ -245,36 +338,40 @@ export async function resendInvitation(actor: AdminActor, userId: string): Promi
   });
 
   if (error || !data.user) {
-    throw new AppError(
-      'No fue posible reenviar la invitación.',
-      502,
-      'ADMIN_USER_INVITATION_RESEND_FAILED',
-      {
-        providerMessage: error?.message,
-      },
-    );
+    if (invitationProviderError(error).code === 'ADMIN_USER_ALREADY_REGISTERED') return recover();
+    throw invitationProviderError(error);
   }
 
-  await prisma.user.update({
-    where: {
-      id: user.id,
-    },
-    data: {
-      authProviderId: data.user.id,
-    },
-  });
-
-  await prisma.auditLog.create({
-    data: {
-      actorId: actor.id,
-      action: 'USER_INVITATION_RESENT',
-      entityType: 'User',
-      entityId: user.id,
-      after: {
-        email: user.email,
-        status: user.status,
+  await prisma.$transaction(async (transaction) => {
+    const updated = await transaction.user.updateMany({
+      where: {
+        id: user.id,
+        status: 'INVITED',
+        authProviderId: null,
       },
-    },
+      data: {
+        authProviderId: data.user.id,
+      },
+    });
+    if (updated.count !== 1)
+      throw new AppError(
+        'El usuario ya no está pendiente de activación.',
+        409,
+        'ADMIN_USER_NOT_INVITED',
+      );
+
+    await transaction.auditLog.create({
+      data: {
+        actorId: actor.id,
+        action: 'USER_INVITATION_RESENT',
+        entityType: 'User',
+        entityId: user.id,
+        after: {
+          email: user.email,
+          status: user.status,
+        },
+      },
+    });
   });
 
   return mapCmsUser(user);

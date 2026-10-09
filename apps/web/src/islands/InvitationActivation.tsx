@@ -1,11 +1,16 @@
 import type { Session } from '@supabase/supabase-js';
 import { getBrowserSupabase } from '../lib/auth/supabase-browser';
-import { isAuthCallback, passwordErrorMessage } from '../lib/auth/auth-feedback';
+import {
+  isAuthCallback,
+  isInvitationCallback,
+  passwordErrorMessage,
+} from '../lib/auth/auth-feedback';
+import { completeEditorialInvitation } from '../lib/auth/invitation-flow';
 import { useEffect, useState, type FormEvent } from 'react';
 import { z } from 'zod';
 import { EditorialLoadingOverlay, EditorialToast } from '../components/editorial/EditorialFeedback';
 import { apiRequest } from '../lib/api-client';
-import { setEditorAccessToken } from '../lib/auth/editor-session';
+import { clearEditorAccessToken } from '../lib/auth/editor-session';
 
 const activationSchema = z.object({
   user: z.object({ displayName: z.string(), email: z.string().email() }),
@@ -22,6 +27,9 @@ export default function InvitationActivation() {
   const [messageTone, setMessageTone] = useState<'success' | 'error' | 'info'>('info');
   const [checking, setChecking] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [passwordSaved, setPasswordSaved] = useState(false);
+  const [recoveryLink, setRecoveryLink] = useState(false);
+  const [activated, setActivated] = useState(false);
 
   useEffect(() => {
     if (!supabaseUrl || !supabaseAnonKey) {
@@ -31,12 +39,16 @@ export default function InvitationActivation() {
       return;
     }
 
-    if (!isAuthCallback(window.location.href, 'invite')) {
+    if (!isInvitationCallback(window.location.href)) {
+      window.history.replaceState(null, '', window.location.pathname);
       setMessageTone('error');
-      setMessage('La invitación no es válida, expiró o ya fue utilizada.');
+      setMessage(
+        'La invitación no es válida, expiró o ya fue utilizada. Solicita una nueva invitación al administrador.',
+      );
       setChecking(false);
       return;
     }
+    setRecoveryLink(isAuthCallback(window.location.href, 'recovery'));
     let active = true;
     void Promise.resolve()
       .then(() => getBrowserSupabase().auth.getSession())
@@ -45,7 +57,9 @@ export default function InvitationActivation() {
         window.history.replaceState(null, '', window.location.pathname);
         if (error || !data.session) {
           setMessageTone('error');
-          setMessage('La invitación no es válida, expiró o ya fue utilizada.');
+          setMessage(
+            'La invitación no es válida, expiró o ya fue utilizada. Solicita una nueva invitación al administrador.',
+          );
           setChecking(false);
           return;
         }
@@ -65,7 +79,10 @@ export default function InvitationActivation() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    await complete(false);
+  }
 
+  async function complete(keepPassword: boolean) {
     if (!supabaseUrl || !supabaseAnonKey) {
       setMessageTone('error');
       setMessage('Las variables públicas de Supabase no están configuradas.');
@@ -74,13 +91,13 @@ export default function InvitationActivation() {
 
     if (!session || loading) return;
 
-    if (password.length < 8) {
+    if (!passwordSaved && !keepPassword && password.length < 8) {
       setMessageTone('error');
       setMessage('La contraseña debe tener al menos 8 caracteres.');
       return;
     }
 
-    if (password !== confirmation) {
+    if (!passwordSaved && !keepPassword && password !== confirmation) {
       setMessageTone('error');
       setMessage('Las contraseñas no coinciden.');
       return;
@@ -91,24 +108,49 @@ export default function InvitationActivation() {
 
     try {
       const supabase = getBrowserSupabase();
-      const { data, error } = await supabase.auth.updateUser({ password });
-      if (error) throw new Error(passwordErrorMessage(error));
-      if (!data.user) throw new Error('No fue posible establecer la contraseña.');
-      const current = await supabase.auth.getSession();
-      if (current.error || !current.data.session)
-        throw new Error('La sesión expiró. Inicia sesión nuevamente.');
-
-      const activation = await apiRequest('/auth/activate-invitation', activationSchema, {
-        method: 'POST',
-        accessToken: current.data.session.access_token,
+      const result = await completeEditorialInvitation({
+        ...(!passwordSaved && !keepPassword
+          ? {
+              savePassword: async () => {
+                const { data, error } = await supabase.auth.updateUser({ password });
+                if (error) throw new Error(passwordErrorMessage(error));
+                if (!data.user) throw new Error('No fue posible establecer la contraseña.');
+              },
+            }
+          : {}),
+        onPasswordSaved: () => {
+          setPasswordSaved(true);
+          setPassword('');
+          setConfirmation('');
+        },
+        activate: async () => {
+          const current = await supabase.auth.getSession();
+          if (current.error || !current.data.session)
+            throw new Error('La sesión expiró. Solicita otro enlace al administrador.');
+          const activation = await apiRequest('/auth/activate-invitation', activationSchema, {
+            method: 'POST',
+            accessToken: current.data.session.access_token,
+          });
+          return activation;
+        },
       });
-      setEditorAccessToken(current.data.session.access_token, true);
+      await supabase.auth.signOut({ scope: 'local' });
+      clearEditorAccessToken();
+      setSession(null);
+      setActivated(true);
       setMessageTone('success');
-      setMessage(`Cuenta activada. Bienvenido, ${activation.user.displayName}.`);
-      window.setTimeout(() => window.location.replace('/editor'), 700);
+      setMessage(
+        `Cuenta activada, ${result.user.displayName}. Ya puedes iniciar sesión con tu correo y contraseña.`,
+      );
     } catch (error: unknown) {
       setMessageTone('error');
-      setMessage(error instanceof Error ? error.message : 'No fue posible activar la cuenta.');
+      setMessage(
+        error instanceof TypeError
+          ? 'No se pudo conectar. Revisa tu conexión y reintenta la activación. Si ya guardaste tu contraseña, no necesitas cambiarla otra vez.'
+          : error instanceof Error
+            ? error.message
+            : 'No fue posible activar la cuenta. Solicita ayuda al administrador.',
+      );
     } finally {
       setLoading(false);
     }
@@ -119,37 +161,58 @@ export default function InvitationActivation() {
       <form className="account-form" onSubmit={submit}>
         <span>Invitación</span>
         <h1>Activa tu cuenta</h1>
-        <p>Define una contraseña para acceder al panel editorial.</p>
+        <p>
+          {activated
+            ? 'Tu cuenta está activa. Inicia sesión con el correo invitado y tu contraseña.'
+            : passwordSaved
+              ? 'Contraseña guardada. Completa la activación editorial.'
+              : recoveryLink
+                ? 'Completa tu acceso editorial. Puedes conservar tu contraseña actual.'
+                : 'Has sido invitado a colaborar en PAG WEB IA. Crea una contraseña para activar tu cuenta y acceder al panel editorial.'}
+        </p>
         {session && (
           <>
-            <label>
-              Contraseña
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                minLength={8}
-                autoComplete="new-password"
-                required
-              />
-            </label>
-            <label>
-              Confirmar contraseña
-              <input
-                type="password"
-                value={confirmation}
-                onChange={(event) => setConfirmation(event.target.value)}
-                minLength={8}
-                autoComplete="new-password"
-                required
-              />
-            </label>
+            {!passwordSaved && (
+              <>
+                <label>
+                  Nueva contraseña
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    minLength={8}
+                    autoComplete="new-password"
+                    required
+                  />
+                </label>
+                <label>
+                  Confirmar contraseña
+                  <input
+                    type="password"
+                    value={confirmation}
+                    onChange={(event) => setConfirmation(event.target.value)}
+                    minLength={8}
+                    autoComplete="new-password"
+                    required
+                  />
+                </label>
+              </>
+            )}
             <button type="submit" disabled={loading}>
-              {loading ? 'Activando…' : 'Activar cuenta'}
+              {loading
+                ? 'Activando…'
+                : passwordSaved
+                  ? 'Reintentar activación editorial'
+                  : 'Crear contraseña y activar cuenta'}
             </button>
+            {recoveryLink && !passwordSaved && (
+              <button type="button" disabled={loading} onClick={() => void complete(true)}>
+                Completar activación sin cambiar contraseña
+              </button>
+            )}
           </>
         )}
-        <a href="/acceso">Volver al inicio de sesión</a>
+        <a href="/acceso">{activated ? 'Ir a iniciar sesión' : 'Volver al inicio de sesión'}</a>
       </form>
 
       <EditorialLoadingOverlay

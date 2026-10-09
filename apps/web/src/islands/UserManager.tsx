@@ -199,7 +199,7 @@ export default function UserManager() {
         method: 'POST',
         accessToken: token,
       });
-      setMessage(`La invitación fue reenviada a ${user.email}.`);
+      setMessage(`Se envió un enlace para completar la activación a ${user.email}.`);
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : 'No fue posible reenviar la invitación.');
     } finally {

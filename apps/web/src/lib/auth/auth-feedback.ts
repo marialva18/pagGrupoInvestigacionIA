@@ -20,6 +20,15 @@ export function isAuthCallback(url: string, expected: 'recovery' | 'invite'): bo
   );
 }
 
+export function isInvitationCallback(url: string): boolean {
+  return isAuthCallback(url, 'invite') || isAuthCallback(url, 'recovery');
+}
+
+export function invitationRedirectFromLogin(url: string): string | null {
+  if (!isAuthCallback(url, 'invite')) return null;
+  return `/auth/aceptar-invitacion${new URL(url).hash}`;
+}
+
 export function safeEditorRedirect(requested: string | null): string {
   if (
     !requested ||

@@ -226,7 +226,7 @@ export default function InstitutionManager() {
         )}
       </label>
       <label className="photo">
-        Fotografía de la página El grupo
+        Fotografía de la página Grupo
         <input
           type="file"
           accept="image/jpeg,image/png,image/webp"
@@ -237,7 +237,7 @@ export default function InstitutionManager() {
           value={form.groupMediaId ?? ''}
           onChange={(e) => field('groupMediaId', e.target.value || null)}
         >
-          <option value="">Sin fotografía para la página El grupo</option>
+          <option value="">Sin fotografía para la página Grupo</option>
           {mediaLibrary.map((media) => (
             <option value={media.id}>{media.originalFilename}</option>
           ))}

@@ -10,7 +10,7 @@
     "check": "astro check",
     "lint": "eslint .",
     "typecheck": "astro check",
-    "test": "node -e \"console.log('Web tests pending')\"",
+    "test": "node --test tests/*.test.ts",
     "start": "node ./dist/server/entry.mjs"
   },
   "dependencies": {

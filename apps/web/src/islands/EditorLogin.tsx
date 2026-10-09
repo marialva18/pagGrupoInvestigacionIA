@@ -1,8 +1,10 @@
-import { createClient } from '@supabase/supabase-js';
+import { getBrowserSupabase } from '../lib/auth/supabase-browser';
 import { useEffect, useState, type FormEvent } from 'react';
 import { z } from 'zod';
 import { EditorialLoadingOverlay, EditorialToast } from '../components/editorial/EditorialFeedback';
-import { apiRequest } from '../lib/api-client';
+import { apiRequest, ApiRequestError } from '../lib/api-client';
+import { safeEditorRedirect } from '../lib/auth/auth-feedback';
+import { loginWithEditorialSession } from '../lib/auth/login-flow';
 import {
   cacheEditorUser,
   clearEditorAccessToken,
@@ -28,11 +30,7 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
 function safeRedirect(): string {
   const requested = new URLSearchParams(window.location.search).get('redirect');
 
-  if (!requested || !requested.startsWith('/') || requested.startsWith('//')) {
-    return '/editor';
-  }
-
-  return requested;
+  return safeEditorRedirect(requested);
 }
 
 export default function EditorLogin() {
@@ -47,9 +45,28 @@ export default function EditorLogin() {
   useEffect(() => {
     setRemember(shouldRememberEditorSession());
 
-    if (getEditorAccessToken()) {
-      window.location.replace(safeRedirect());
-    }
+    const token = getEditorAccessToken();
+    if (!token) return;
+    setLoading(true);
+    let active = true;
+    void apiRequest('/auth/session', sessionSchema, { accessToken: token })
+      .then((session) => {
+        if (!active) return;
+        cacheEditorUser(session.user, shouldRememberEditorSession());
+        window.location.replace(safeRedirect());
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        if (error instanceof ApiRequestError && [401, 403].includes(error.status))
+          clearEditorAccessToken();
+        setMessage('No se pudo validar la sesión guardada. Puedes iniciar sesión nuevamente.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -71,28 +88,18 @@ export default function EditorLogin() {
         throw new Error('Las variables públicas de Supabase no están configuradas.');
       }
 
-      const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-          detectSessionInUrl: false,
-        },
-      });
+      const supabase = getBrowserSupabase();
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password,
-      });
+      const { token, session } = await loginWithEditorialSession(
+        () =>
+          supabase.auth.signInWithPassword({
+            email: email.trim().toLowerCase(),
+            password,
+          }),
+        (accessToken) => apiRequest('/auth/session', sessionSchema, { accessToken }),
+      );
 
-      if (error || !data.session?.access_token) {
-        throw new Error('El correo o la contraseña no son correctos.');
-      }
-
-      const session = await apiRequest('/auth/session', sessionSchema, {
-        accessToken: data.session.access_token,
-      });
-
-      setEditorAccessToken(data.session.access_token, remember);
+      setEditorAccessToken(token, remember);
       cacheEditorUser(session.user, remember);
       setMessageType('success');
       setMessage(`Bienvenido, ${session.user.displayName}.`);

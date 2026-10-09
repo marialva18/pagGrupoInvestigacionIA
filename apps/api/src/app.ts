@@ -5,6 +5,7 @@ import express, { type Express } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
+import { AppError } from './common/errors/app-error.js';
 import { errorMiddleware } from './common/middlewares/error.middleware.js';
 import { notFoundMiddleware } from './common/middlewares/not-found.middleware.js';
 import { allowedOrigins } from './config/env.js';
@@ -25,9 +26,13 @@ export function createApp(options: ApiV1RouterOptions = {}): Express {
           return;
         }
 
-        callback(new Error('CORS origin not allowed'));
+        callback(new AppError('Origen no autorizado.', 403, 'CORS_ORIGIN_DENIED'));
       },
       credentials: true,
+      allowedHeaders: ['Authorization', 'Content-Type', 'Accept', 'X-Request-Id'],
+      exposedHeaders: ['X-Request-Id'],
+      methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      optionsSuccessStatus: 204,
     }),
   );
 
@@ -48,6 +53,7 @@ export function createApp(options: ApiV1RouterOptions = {}): Express {
 
   application.use(
     pinoHttp({
+      redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]'],
       genReqId(request, response) {
         const incomingRequestId = request.headers['x-request-id'];
 

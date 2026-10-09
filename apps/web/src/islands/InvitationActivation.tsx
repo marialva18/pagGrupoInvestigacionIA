@@ -1,4 +1,6 @@
-import { createClient, type Session } from '@supabase/supabase-js';
+import type { Session } from '@supabase/supabase-js';
+import { getBrowserSupabase } from '../lib/auth/supabase-browser';
+import { isAuthCallback, passwordErrorMessage } from '../lib/auth/auth-feedback';
 import { useEffect, useState, type FormEvent } from 'react';
 import { z } from 'zod';
 import { EditorialLoadingOverlay, EditorialToast } from '../components/editorial/EditorialFeedback';
@@ -29,20 +31,36 @@ export default function InvitationActivation() {
       return;
     }
 
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: true },
-    });
-
-    void supabase.auth.getSession().then(({ data, error }) => {
-      if (error || !data.session) {
-        setMessageTone('error');
-        setMessage('La invitación no es válida, expiró o ya fue utilizada.');
-        setChecking(false);
-        return;
-      }
-      setSession(data.session);
+    if (!isAuthCallback(window.location.href, 'invite')) {
+      setMessageTone('error');
+      setMessage('La invitación no es válida, expiró o ya fue utilizada.');
       setChecking(false);
-    });
+      return;
+    }
+    let active = true;
+    void Promise.resolve()
+      .then(() => getBrowserSupabase().auth.getSession())
+      .then(({ data, error }) => {
+        if (!active) return;
+        window.history.replaceState(null, '', window.location.pathname);
+        if (error || !data.session) {
+          setMessageTone('error');
+          setMessage('La invitación no es válida, expiró o ya fue utilizada.');
+          setChecking(false);
+          return;
+        }
+        setSession(data.session);
+        setChecking(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setMessageTone('error');
+        setMessage('No fue posible validar la invitación. Solicita un enlace nuevo.');
+        setChecking(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -72,21 +90,19 @@ export default function InvitationActivation() {
     setMessage('');
 
     try {
-      const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-      });
-      await supabase.auth.setSession({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-      });
+      const supabase = getBrowserSupabase();
       const { data, error } = await supabase.auth.updateUser({ password });
-      if (error || !data.user) throw new Error('No fue posible establecer la contraseña.');
+      if (error) throw new Error(passwordErrorMessage(error));
+      if (!data.user) throw new Error('No fue posible establecer la contraseña.');
+      const current = await supabase.auth.getSession();
+      if (current.error || !current.data.session)
+        throw new Error('La sesión expiró. Inicia sesión nuevamente.');
 
       const activation = await apiRequest('/auth/activate-invitation', activationSchema, {
         method: 'POST',
-        accessToken: session.access_token,
+        accessToken: current.data.session.access_token,
       });
-      setEditorAccessToken(session.access_token, true);
+      setEditorAccessToken(current.data.session.access_token, true);
       setMessageTone('success');
       setMessage(`Cuenta activada. Bienvenido, ${activation.user.displayName}.`);
       window.setTimeout(() => window.location.replace('/editor'), 700);
